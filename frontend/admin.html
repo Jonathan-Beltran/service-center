@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin – Service Center Scheduler</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; padding: 24px; background: #f5f5f5; color: #222; }
+
+    h1 { font-size: 1.4rem; margin-bottom: 24px; }
+    h2 { font-size: 1.05rem; font-weight: 700; margin-bottom: 14px; }
+
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .divider { border: none; border-top: 1px solid #e8e8e8; margin: 16px 0; }
+
+    /* Shift capacity grid */
+    .shift-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+    }
+
+    .shift-cell { text-align: center; }
+
+    .shift-cell label {
+      display: block;
+      font-size: 0.7rem;
+      color: #666;
+      margin-bottom: 4px;
+      line-height: 1.3;
+    }
+
+    .shift-cell input {
+      width: 100%;
+      text-align: center;
+      font-size: 0.9rem;
+      padding: 6px 4px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+
+    .shift-cell.yellow label { color: #b08300; }
+    .shift-cell.yellow input { background: #fffbe6; border-color: #ffe066; }
+
+    .shift-cell.locked label { color: #aaa; }
+    .shift-cell.locked label::after { content: " (auto)"; font-style: italic; font-size: 0.65rem; }
+    .shift-cell.locked input { background: #f4f4f4; color: #aaa; cursor: not-allowed; border-color: #ddd; }
+
+    /* Yellows toggle */
+    .yellows-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      font-size: 0.88rem;
+    }
+
+    .yellows-row input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+
+    /* Workers table */
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 2px solid #e8e8e8;
+      font-weight: 600;
+      font-size: 0.82rem;
+      color: #555;
+    }
+    td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; }
+    tr:last-child td { border-bottom: none; }
+    td.center { text-align: center; }
+
+    .add-worker-row {
+      display: grid;
+      grid-template-columns: 1.2fr 1.2fr 80px auto;
+      gap: 10px;
+      align-items: end;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid #e8e8e8;
+    }
+
+    .field-group label {
+      display: block;
+      font-size: 0.78rem;
+      color: #666;
+      margin-bottom: 4px;
+    }
+
+    .field-group input[type="text"],
+    .field-group input[type="number"] {
+      width: 100%;
+      font-size: 0.9rem;
+      padding: 7px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+
+    .field-group.center-field { text-align: center; }
+    .field-group.center-field input[type="checkbox"] { width: 18px; height: 18px; margin-top: 8px; cursor: pointer; }
+
+    /* Preferences */
+    textarea {
+      width: 100%;
+      font-family: monospace;
+      font-size: 0.82rem;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      resize: vertical;
+    }
+
+    .pref-actions { display: flex; gap: 10px; margin-top: 8px; }
+
+    .pref-list { margin-top: 12px; }
+
+    .pref-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      font-size: 0.85rem;
+    }
+
+    .pref-item .initials { font-weight: 700; margin-right: 8px; }
+    .pref-item .count { color: #777; }
+
+    .empty-msg { font-size: 0.85rem; color: #aaa; font-style: italic; }
+
+    /* Buttons */
+    .btn {
+      padding: 8px 16px;
+      font-size: 0.88rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .btn-primary { background: #3b5bdb; color: white; }
+    .btn-primary:hover { background: #2f4ac7; }
+
+    .btn-ghost { background: #e9ecef; color: #444; }
+    .btn-ghost:hover { background: #dee2e6; }
+
+    .btn-danger { background: #fff0f0; color: #c92a2a; border: 1px solid #ffc9c9; }
+    .btn-danger:hover { background: #ffe3e3; }
+    .btn-danger.sm { padding: 4px 10px; font-size: 0.78rem; }
+
+    .btn-run {
+      width: 100%;
+      padding: 15px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      background: #2f9e44;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-bottom: 18px;
+      letter-spacing: 0.02em;
+    }
+    .btn-run:hover { background: #276236; }
+    .btn-run:disabled { background: #aaa; cursor: not-allowed; }
+
+    /* Login overlay */
+    .login-overlay {
+      position: fixed;
+      inset: 0;
+      background: #f5f5f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .login-box {
+      background: white;
+      border-radius: 10px;
+      padding: 32px 28px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+      width: 100%;
+      max-width: 340px;
+    }
+    .login-box h2 { font-size: 1.1rem; margin-bottom: 18px; }
+    .login-box input {
+      width: 100%;
+      font-size: 1rem;
+      padding: 9px 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+    .login-box input:focus { outline: none; border-color: #3b5bdb; }
+    .login-box button {
+      width: 100%;
+      padding: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      background: #3b5bdb;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .login-box button:hover { background: #2f4ac7; }
+    .login-error {
+      color: #c92a2a;
+      font-size: 0.82rem;
+      margin-top: 8px;
+      display: none;
+    }
+
+    /* Status */
+    .status {
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 0.88rem;
+      display: none;
+    }
+    .status.error { background: #ffe3e3; color: #c92a2a; border: 1px solid #ffc9c9; display: block; }
+    .status.success { background: #d3f9d8; color: #2b8a3e; border: 1px solid #b2f2bb; display: block; }
+
+    /* Results */
+    .result-scroll { overflow-x: auto; }
+
+    .result-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      min-width: 600px;
+    }
+
+    .result-table th, .result-table td {
+      border: 1px solid #e0e0e0;
+      padding: 8px 6px;
+      text-align: center;
+      vertical-align: top;
+    }
+
+    .result-table th { background: #f0f4ff; font-weight: 600; }
+    .result-table td.shift-label { background: #f8f9fa; font-weight: 600; font-size: 0.75rem; text-align: left; padding-left: 10px; white-space: nowrap; }
+    .result-table td.shift-label.yellow { background: #fffbe6; }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+    .chip {
+      background: #3b5bdb;
+      color: white;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 0.72rem;
+    }
+    .empty-slot { color: #ccc; }
+  </style>
+</head>
+<body>
+
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <h2>Admin Login</h2>
+    <input type="password" id="password-input" placeholder="Password" onkeydown="if(event.key==='Enter') login()">
+    <button onclick="login()">Sign in</button>
+    <div class="login-error" id="login-error">Wrong password.</div>
+  </div>
+</div>
+
+<h1>Admin Panel</h1>
+
+<!-- SCHEDULE SETTINGS -->
+<div class="card">
+  <h2>Shift Sizes</h2>
+
+  <div class="section-label">Number of people per shift. (Monday - Friday)</div>
+  <div class="shift-grid" id="weekday-grid"></div>
+
+  <hr class="divider">
+
+  <div class="section-label">Number of people per shift. (Saturday - Sunday)</div>
+  <div class="shift-grid" id="weekend-grid"></div>
+
+  <div class="yellows-row">
+    <input type="checkbox" id="yellows" checked>
+    <label for="yellows">Yellows?</label>
+  </div>
+</div>
+
+<!-- WORKERS -->
+<div class="card">
+  <h2>Add Workers</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Initials</th>
+        <th>Priority Points</th>
+        <th style="text-align:center">Doubles</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="workers-tbody">
+      <tr id="workers-empty-row"><td colspan="4" class="empty-msg" style="padding:12px 10px">No workers added yet.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="add-worker-row">
+    <div class="field-group">
+      <label>Initials</label>
+      <input type="text" id="new-initials" placeholder="e.g. HM" maxlength="6">
+    </div>
+    <div class="field-group">
+      <label>Priority Points</label>
+      <input type="number" id="new-points" placeholder="0" step="0.01" min="0">
+    </div>
+    <div class="field-group center-field">
+      <label>Doubles?</label>
+      <input type="checkbox" id="new-doubles">
+    </div>
+    <div>
+      <button class="btn btn-primary" onclick="addWorker()">Add</button>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="section-label">Bulk import (recommended)</div>
+  <textarea id="bulk-input" rows="5" placeholder="Copy and paste from the Priority Points Rankings Spreadsheet (dont include commas)&#10;Example:&#10;HM        8516.38&#10;DH        5648.00&#10;AB        4265.71"></textarea>
+  <div style="display:flex;gap:10px;align-items:center;margin-top:8px;">
+    <button class="btn btn-primary" onclick="bulkAddWorkers()">Import</button>
+    <span id="bulk-status" style="font-size:0.82rem;color:#555;"></span>
+  </div>
+</div>
+
+<!-- WORKER PREFERENCES -->
+<div class="card">
+  <h2>Submitted Shifts</h2>
+  <div class="pref-actions">
+    <button class="btn btn-primary" onclick="loadPreferences()">Refresh</button>
+    <button class="btn btn-ghost" onclick="clearPreferences()">Clear All</button>
+  </div>
+  <div class="pref-list" id="pref-list" style="margin-top:12px;">
+    <p class="empty-msg">Click Refresh to load submitted preferences.</p>
+  </div>
+</div>
+
+<!-- RUN -->
+<button class="btn-run" id="run-btn" onclick="runSchedule()">Run Schedule</button>
+
+<div class="status" id="status-msg"></div>
+
+<!-- RESULTS -->
+<div class="card" id="results-card" style="display:none">
+  <h2>Schedule Results</h2>
+  <div class="result-scroll" id="result-grid"></div>
+</div>
+
+<script>
+  // ── Auth ─────────────────────────────────────────────────────────────────
+
+  let adminToken = sessionStorage.getItem("adminToken");
+
+  function authHeaders() {
+    return { "Content-Type": "application/json", "Authorization": `Bearer ${adminToken}` };
+  }
+
+  async function login() {
+    const password = document.getElementById("password-input").value;
+    const errorEl = document.getElementById("login-error");
+    errorEl.style.display = "none";
+    try {
+      const res = await fetch("http://localhost:8000/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password })
+      });
+      if (!res.ok) { errorEl.style.display = "block"; return; }
+      const data = await res.json();
+      adminToken = data.token;
+      sessionStorage.setItem("adminToken", adminToken);
+      document.getElementById("login-overlay").style.display = "none";
+      loadPreferences();
+    } catch {
+      errorEl.textContent = "Could not reach server.";
+      errorEl.style.display = "block";
+    }
+  }
+
+  function handleUnauthorized() {
+    adminToken = null;
+    sessionStorage.removeItem("adminToken");
+    document.getElementById("login-overlay").style.display = "flex";
+    document.getElementById("password-input").value = "";
+  }
+
+  // Hide overlay immediately if we have a stored token; validate it lazily on first request
+  if (adminToken) document.getElementById("login-overlay").style.display = "none";
+
+  const SHIFT_LABELS = [
+    "12am – 3am",
+    "3am – 6am",
+    "6am – 9am",
+    "9am – 12pm",
+    "12pm – 3pm",
+    "3pm – 6pm",
+    "6pm – 9pm",
+    "9pm – 12am"
+  ];
+  const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const YELLOW_SHIFTS = [3, 4, 5];
+
+  // Defaults — index 1 (3am-6am) mirrors index 0 automatically
+  const DEFAULT_WEEKDAYS = [1, 1, 2, 3, 3, 3, 2, 2];
+  const DEFAULT_WEEKENDS = [1, 1, 1, 2, 2, 2, 2, 2];
+
+  let workers = [];    // { initials, points, doubles }
+  let preferences = []; // { initials, times }
+
+  // ── Build capacity grids ──────────────────────────────────────────────────
+
+  function buildGrid(containerId, defaults) {
+    const el = document.getElementById(containerId);
+    el.innerHTML = "";
+    SHIFT_LABELS.forEach((label, i) => {
+      const locked = i === 1;
+      const cell = document.createElement("div");
+      cell.className = "shift-cell" + (locked ? " locked" : "");
+      cell.dataset.shift = i;
+      cell.innerHTML = locked
+        ? `<label>${label}</label><input type="number" value="${defaults[i]}" id="${containerId}-${i}" disabled>`
+        : `<label>${label}</label><input type="number" min="0" max="20" value="${defaults[i]}" id="${containerId}-${i}">`;
+      el.appendChild(cell);
+    });
+  }
+
+  function syncGraveCapacity(gridId) {
+    document.getElementById(`${gridId}-1`).value = document.getElementById(`${gridId}-0`).value;
+  }
+
+  function updateYellowHighlight() {
+    const checked = document.getElementById("yellows").checked;
+    YELLOW_SHIFTS.forEach(i => {
+      document.querySelector(`#weekday-grid [data-shift="${i}"]`).classList.toggle("yellow", checked);
+    });
+  }
+
+  buildGrid("weekday-grid", DEFAULT_WEEKDAYS);
+  buildGrid("weekend-grid", DEFAULT_WEEKENDS);
+  updateYellowHighlight();
+
+  document.getElementById("weekday-grid-0").addEventListener("input", () => syncGraveCapacity("weekday-grid"));
+  document.getElementById("weekend-grid-0").addEventListener("input", () => syncGraveCapacity("weekend-grid"));
+  document.getElementById("yellows").addEventListener("change", updateYellowHighlight);
+
+  function getCapacities(gridId) {
+    return SHIFT_LABELS.map((_, i) => parseInt(document.getElementById(`${gridId}-${i}`).value) || 0);
+  }
+
+  // ── Workers ───────────────────────────────────────────────────────────────
+
+  function renderWorkers() {
+    const tbody = document.getElementById("workers-tbody");
+    const emptyRow = document.getElementById("workers-empty-row");
+
+    // Remove all rows except the empty placeholder
+    Array.from(tbody.querySelectorAll("tr.worker-row")).forEach(r => r.remove());
+
+    if (workers.length === 0) {
+      emptyRow.style.display = "";
+      return;
+    }
+    emptyRow.style.display = "none";
+
+    workers.forEach((w, i) => {
+      const tr = document.createElement("tr");
+      tr.className = "worker-row";
+      tr.innerHTML = `
+        <td><strong>${w.initials}</strong></td>
+        <td>${w.points.toLocaleString()}</td>
+        <td class="center"><input type="checkbox" ${w.doubles ? "checked" : ""} onchange="toggleDoubles(${i}, this.checked)" style="width:16px;height:16px;cursor:pointer;"></td>
+        <td><button class="btn btn-danger sm" onclick="removeWorker(${i})">Remove</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function addWorker() {
+    const initials = document.getElementById("new-initials").value.trim().toUpperCase();
+    const points = parseFloat(document.getElementById("new-points").value) || 0;
+    const doubles = document.getElementById("new-doubles").checked;
+
+    if (!initials) { alert("Enter initials."); return; }
+    if (workers.find(w => w.initials === initials)) { alert(`${initials} is already in the list.`); return; }
+
+    workers.push({ initials, points, doubles });
+    document.getElementById("new-initials").value = "";
+    document.getElementById("new-points").value = "";
+    document.getElementById("new-doubles").checked = false;
+    renderWorkers();
+    syncWorkers();
+  }
+
+  function removeWorker(index) {
+    workers.splice(index, 1);
+    renderWorkers();
+    syncWorkers();
+  }
+
+  function toggleDoubles(index, value) {
+    workers[index].doubles = value;
+    syncWorkers();
+  }
+
+  async function syncWorkers() {
+    try {
+      await fetch("http://localhost:8000/workers", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(workers)
+      });
+    } catch { /* non-critical, ignore */ }
+  }
+
+  function bulkAddWorkers() {
+    const raw = document.getElementById("bulk-input").value.trim();
+    const statusEl = document.getElementById("bulk-status");
+    if (!raw) { statusEl.textContent = "Paste some data first."; return; }
+
+    let added = 0, skipped = 0;
+    raw.split("\n").forEach(line => {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length < 2) return;
+      const initials = parts[0].toUpperCase();
+      const points = parseFloat(parts[1]);
+      if (!initials || isNaN(points)) return;
+      if (workers.find(w => w.initials === initials)) { skipped++; return; }
+      workers.push({ initials, points, doubles: false });
+      added++;
+    });
+
+    renderWorkers();
+    syncWorkers();
+    document.getElementById("bulk-input").value = "";
+    statusEl.textContent = `Added ${added}${skipped ? `, skipped ${skipped} duplicate${skipped > 1 ? "s" : ""}` : ""}.`;
+    setTimeout(() => { statusEl.textContent = ""; }, 3000);
+  }
+
+  // ── Preferences ───────────────────────────────────────────────────────────
+
+  function renderPreferences() {
+    const list = document.getElementById("pref-list");
+    if (preferences.length === 0) {
+      list.innerHTML = '<p class="empty-msg">No preferences submitted yet.</p>';
+      return;
+    }
+    list.innerHTML = preferences.map((p, i) => `
+      <div class="pref-item">
+        <span><span class="initials">${p.initials}</span><span class="count">${p.times.length} shift${p.times.length !== 1 ? "s" : ""} selected</span></span>
+        <button class="btn btn-danger sm" onclick="removePref('${p.initials}')">Remove</button>
+      </div>
+    `).join("");
+  }
+
+  async function loadPreferences() {
+    try {
+      const res = await fetch("http://localhost:8000/preferences", { headers: authHeaders() });
+      if (res.status === 401) { handleUnauthorized(); return; }
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const data = await res.json();
+      preferences = data.map(p => ({ initials: p.initials, times: p.times }));
+      renderPreferences();
+    } catch (err) {
+      alert(`Could not load preferences: ${err.message}`);
+    }
+  }
+
+  async function removePref(initials) {
+    try {
+      const res = await fetch(`http://localhost:8000/preferences/${initials}`, { method: "DELETE", headers: authHeaders() });
+      if (res.status === 401) { handleUnauthorized(); return; }
+    } catch { /* ignore network errors */ }
+    preferences = preferences.filter(p => p.initials !== initials);
+    renderPreferences();
+  }
+
+  async function clearPreferences() {
+    if (preferences.length === 0) return;
+    if (!confirm("Clear all submitted preferences?")) return;
+    try {
+      const res = await fetch("http://localhost:8000/preferences", { method: "DELETE", headers: authHeaders() });
+      if (res.status === 401) { handleUnauthorized(); return; }
+    } catch { /* ignore network errors */ }
+    preferences = [];
+    renderPreferences();
+  }
+
+  // ── Run Schedule ──────────────────────────────────────────────────────────
+
+  async function runSchedule() {
+    const btn = document.getElementById("run-btn");
+    const statusEl = document.getElementById("status-msg");
+
+    if (workers.length === 0) { showStatus("Add at least one worker before running.", "error"); return; }
+    if (preferences.length === 0) { showStatus("Add at least one worker preference before running.", "error"); return; }
+
+    const weekdays = getCapacities("weekday-grid");
+    const weekends = getCapacities("weekend-grid");
+    const yellows = document.getElementById("yellows").checked;
+
+    const payload = {
+      worker_preferences: preferences.map(p => ({
+        worker_initials: p.initials,
+        times: p.times
+      })),
+      admin_settings: {
+        weekdays,
+        weekends,
+        yellows,
+        doublesRecipients: workers.filter(w => w.doubles).map(w => w.initials),
+        all_initials: workers.map(w => w.initials),
+        priority_points: workers.map(w => w.points)
+      }
+    };
+
+    btn.disabled = true;
+    btn.textContent = "Running…";
+    statusEl.className = "status";
+
+    try {
+      const res = await fetch("http://localhost:8000/run_schedule", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(payload)
+      });
+
+      if (res.status === 401) { handleUnauthorized(); return; }
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        showStatus(`Server error ${res.status}: ${JSON.stringify(data?.detail ?? data)}`, "error");
+        return;
+      }
+
+      if (data?.error) {
+        renderResults(data.schedule, yellows);
+        showStatus("Could not fill all required slots:", "error", data.unfilled);
+        document.getElementById("results-card").scrollIntoView({ behavior: "smooth" });
+        return;
+      }
+
+      renderResults(data, yellows);
+      showStatus("Schedule generated successfully.", "success");
+      document.getElementById("results-card").scrollIntoView({ behavior: "smooth" });
+
+    } catch (err) {
+      showStatus(`Request failed: ${err.message}. Make sure the backend is running on http://localhost:8000.`, "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Run Schedule";
+    }
+  }
+
+  function showStatus(msg, type, items = []) {
+    const el = document.getElementById("status-msg");
+    el.className = `status ${type}`;
+    if (items.length > 0) {
+      el.innerHTML = `${msg}<ul style="margin-top:6px;padding-left:18px;">${items.map(s => `<li>${s}</li>`).join("")}</ul>`;
+    } else {
+      el.textContent = msg;
+    }
+  }
+
+  // ── Render Results ────────────────────────────────────────────────────────
+
+  function renderResults(schedule, yellows) {
+    const card = document.getElementById("results-card");
+    const grid = document.getElementById("result-grid");
+    card.style.display = "block";
+
+    // schedule[dayIndex][shiftIndex] = [initials, ...]
+    let html = `<table class="result-table">
+      <thead><tr><th>Shift</th>${DAY_LABELS.map(d => `<th>${d}</th>`).join("")}</tr></thead>
+      <tbody>`;
+
+    SHIFT_LABELS.forEach((shiftLabel, si) => {
+      const isYellow = yellows && YELLOW_SHIFTS.includes(si);
+      html += `<tr><td class="shift-label${isYellow ? " yellow" : ""}">${shiftLabel}</td>`;
+
+      DAY_LABELS.forEach((_, di) => {
+        const assigned = schedule[di]?.[si] ?? [];
+        if (assigned.length > 0) {
+          html += `<td><div class="chips">${assigned.map(n => `<span class="chip">${n}</span>`).join("")}</div></td>`;
+        } else {
+          html += `<td><span class="empty-slot">—</span></td>`;
+        }
+      });
+
+      html += "</tr>";
+    });
+
+    html += "</tbody></table>";
+    grid.innerHTML = html;
+  }
+
+  // Init
+  renderWorkers();
+  loadPreferences();
+</script>
+</body>
+</html>

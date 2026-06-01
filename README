@@ -1,0 +1,12 @@
+Backend
+  In your terminal, run:
+  cd /Users/jonathanbeltran/service-center/backend
+  source venv/bin/activate
+  ADMIN_PASSWORD=yourpassword uvicorn main:app --reload
+ You should see Uvicorn running on http://127.0.0.1:8000.
+
+Frontend
+
+  Open both files directly in your browser:
+  - frontend/index.html — the worker shift picker
+  - frontend/admin.html — the admin panel

@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shift Preference Picker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; padding: 24px; background: #f5f5f5; color: #222; }
+
+    header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    h1 { font-size: 1.3rem; }
+
+    select {
+      font-size: 1rem;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      background: white;
+      cursor: pointer;
+    }
+
+    .week { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .day {
+      background: white;
+      border-radius: 8px;
+      padding: 14px;
+      flex: 1;
+      min-width: 140px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .day h2 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+      padding-bottom: 7px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+
+    .shift {
+      position: relative;
+      padding: 8px 10px;
+      border-radius: 5px;
+      margin-bottom: 6px;
+      background: #f0f4ff;
+      font-size: 0.8rem;
+      color: #333;
+      cursor: pointer;
+      user-select: none;
+      border: 2px solid transparent;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .shift:last-child { margin-bottom: 0; }
+
+    .shift:hover { background: #dde8ff; }
+
+    .shift.selected {
+      background: #3b5bdb;
+      color: white;
+      border-color: #2f4ac7;
+    }
+
+    .rank-badge {
+      position: absolute;
+      top: 5px;
+      right: 7px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      background: white;
+      color: #3b5bdb;
+      border-radius: 10px;
+      padding: 1px 6px;
+      line-height: 1.4;
+    }
+
+    .hint {
+      font-size: 0.82rem;
+      color: #666;
+      margin-left: auto;
+    }
+
+    .output-section { margin-top: 28px; }
+    .output-section h2 { font-size: 1rem; margin-bottom: 10px; }
+
+    .output-box {
+      background: white;
+      color: #222;
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 0.88rem;
+      border: 1px solid #e0e0e0;
+      line-height: 1.8;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      align-items: center;
+    }
+
+    .copy-btn {
+      padding: 7px 16px;
+      font-size: 0.85rem;
+      background: #3b5bdb;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: #2f4ac7; }
+    .copy-btn:active { background: #253ea8; }
+
+    .submit-btn {
+      padding: 7px 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      background: #2f9e44;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .submit-btn:hover { background: #276236; }
+    .submit-btn:disabled { background: #aaa; cursor: not-allowed; }
+
+    .submit-status {
+      font-size: 0.82rem;
+      padding: 3px 10px;
+      border-radius: 5px;
+    }
+    .submit-status.ok { color: #2b8a3e; background: #d3f9d8; }
+    .submit-status.err { color: #c92a2a; background: #ffe3e3; }
+
+    .no-user { opacity: 0.45; pointer-events: none; }
+
+    /* ── Mobile ────────────────────────────────────────────────────── */
+    .day-tabs { display: none; }
+
+    @media (max-width: 640px) {
+      body { padding: 14px; }
+
+      header { flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 16px; }
+      h1 { font-size: 1.15rem; }
+      select { width: 100%; font-size: 0.95rem; }
+      .hint { margin-left: 0; }
+
+      .day-tabs {
+        display: flex;
+        overflow-x: auto;
+        gap: 6px;
+        margin-bottom: 10px;
+        padding-bottom: 2px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .day-tabs::-webkit-scrollbar { display: none; }
+
+      .day-tab {
+        flex-shrink: 0;
+        padding: 7px 14px;
+        border-radius: 20px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        background: #e9ecef;
+        color: #555;
+        border: none;
+        cursor: pointer;
+        transition: background 0.12s;
+      }
+      .day-tab.active { background: #3b5bdb; color: white; }
+
+      .week { display: block; }
+      .day { display: none; }
+      .day.mobile-active { display: block; }
+
+      .shift { padding: 11px 12px; font-size: 0.85rem; margin-bottom: 8px; }
+
+      .output-section { margin-top: 20px; }
+      .submit-btn, .copy-btn { flex: 1; padding: 11px; font-size: 0.9rem; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Shift Preference Picker</h1>
+    <select id="user-select">
+      <option value="">— Loading… —</option>
+    </select>
+    <span class="hint">Click shifts in order of preference</span>
+  </header>
+
+  <div class="day-tabs" id="day-tabs"></div>
+  <div class="week no-user" id="week"></div>
+
+  <div class="output-section">
+    <h2>Your selections</h2>
+    <div class="output-box" id="output">Select your initials to begin.</div>
+    <div class="btn-row">
+      <button class="submit-btn" id="submit-btn" onclick="submitPreference()">Submit</button>
+      <button class="copy-btn" id="copy-btn" onclick="copyOutput()">Copy</button>
+      <span class="submit-status" id="submit-status" style="display:none"></span>
+    </div>
+  </div>
+
+  <script>
+    const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    const dayShorts = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    let activeDayTab = 0;
+    const shifts = [
+      "12am – 3am",
+      null,           // 3am-6am: system only, never shown
+      "6am – 9am",
+      "9am – 12pm",
+      "12pm – 3pm",
+      "3pm – 6pm",
+      "6pm – 9pm",
+      "9pm – 12am"
+    ];
+
+    // selections: ordered list of [dayIndex, shiftIndex]
+    let selections = [];
+    let currentUser = "";
+
+    function renderWeek() {
+      const week = document.getElementById("week");
+      week.innerHTML = "";
+
+      days.forEach((day, dayIndex) => {
+        const dayEl = document.createElement("div");
+        dayEl.className = "day";
+        dayEl.innerHTML = `<h2>${day}</h2>`;
+
+        shifts.forEach((shift, shiftIndex) => {
+          if (shift === null) return; // skip 3am-6am (system only)
+          const rank = selections.findIndex(s => s[0] === dayIndex && s[1] === shiftIndex);
+          const isSelected = rank !== -1;
+
+          const shiftEl = document.createElement("div");
+          shiftEl.className = "shift" + (isSelected ? " selected" : "");
+          shiftEl.innerHTML = `${shift}${isSelected ? `<span class="rank-badge">${rank + 1}</span>` : ""}`;
+          shiftEl.onclick = () => toggleShift(dayIndex, shiftIndex);
+
+          dayEl.appendChild(shiftEl);
+        });
+
+        week.appendChild(dayEl);
+      });
+
+      updateDayVisibility();
+      updateOutput();
+    }
+
+    function initDayTabs() {
+      const container = document.getElementById("day-tabs");
+      days.forEach((_, i) => {
+        const btn = document.createElement("button");
+        btn.className = "day-tab" + (i === 0 ? " active" : "");
+        btn.textContent = dayShorts[i];
+        btn.onclick = () => setActiveDay(i);
+        container.appendChild(btn);
+      });
+    }
+
+    function setActiveDay(index) {
+      activeDayTab = index;
+      document.querySelectorAll(".day-tab").forEach((btn, i) => {
+        btn.classList.toggle("active", i === index);
+      });
+      updateDayVisibility();
+    }
+
+    function updateDayVisibility() {
+      document.querySelectorAll("#week .day").forEach((el, i) => {
+        el.classList.toggle("mobile-active", i === activeDayTab);
+      });
+    }
+
+    function toggleShift(dayIndex, shiftIndex) {
+      const idx = selections.findIndex(s => s[0] === dayIndex && s[1] === shiftIndex);
+      if (idx !== -1) {
+        selections.splice(idx, 1);
+      } else {
+        selections.push([dayIndex, shiftIndex]);
+      }
+      renderWeek();
+    }
+
+    function updateOutput() {
+      const out = document.getElementById("output");
+      if (!currentUser) {
+        out.textContent = "Select your initials to begin.";
+        return;
+      }
+      if (selections.length === 0) {
+        out.textContent = "No shifts selected yet.";
+        return;
+      }
+      out.innerHTML = selections
+        .map((s, i) => `<span style="color:#888;font-size:0.78rem">${i + 1}.</span> ${days[s[0]]} &nbsp;<strong>${shifts[s[1]] ?? "3am – 6am"}</strong>`)
+        .join("<br>");
+    }
+
+    function copyOutput() {
+      const text = document.getElementById("output").textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById("copy-btn");
+        btn.textContent = "Copied!";
+        setTimeout(() => btn.textContent = "Copy", 1500);
+      });
+    }
+
+    async function submitPreference() {
+      if (!currentUser || selections.length === 0) return;
+      const btn = document.getElementById("submit-btn");
+      const statusEl = document.getElementById("submit-status");
+      btn.disabled = true;
+      btn.textContent = "Submitting…";
+      statusEl.style.display = "none";
+      try {
+        const res = await fetch("http://localhost:8000/submit_preference", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ initials: currentUser, times: selections })
+        });
+        if (!res.ok) throw new Error(`Server error ${res.status}`);
+        statusEl.textContent = "Submitted!";
+        statusEl.className = "submit-status ok";
+      } catch (err) {
+        statusEl.textContent = err.message;
+        statusEl.className = "submit-status err";
+      } finally {
+        statusEl.style.display = "";
+        btn.disabled = false;
+        btn.textContent = "Submit";
+        setTimeout(() => { statusEl.style.display = "none"; }, 3000);
+      }
+    }
+
+    document.getElementById("user-select").addEventListener("change", function () {
+      currentUser = this.value;
+      selections = [];
+      const week = document.getElementById("week");
+      if (currentUser) {
+        week.classList.remove("no-user");
+      } else {
+        week.classList.add("no-user");
+      }
+      renderWeek();
+    });
+
+    async function loadWorkers() {
+      const select = document.getElementById("user-select");
+      try {
+        const res = await fetch("http://localhost:8000/workers");
+        if (!res.ok) throw new Error();
+        const workers = await res.json();
+        select.innerHTML = '<option value="">— Select your initials —</option>';
+        workers.forEach(w => {
+          const opt = document.createElement("option");
+          opt.value = w.initials;
+          opt.textContent = w.initials;
+          select.appendChild(opt);
+        });
+        if (workers.length === 0) {
+          select.innerHTML = '<option value="">— No workers added yet —</option>';
+        }
+      } catch {
+        select.innerHTML = '<option value="">— Could not load workers —</option>';
+      }
+    }
+
+    loadWorkers();
+    initDayTabs();
+    renderWeek();
+  </script>
+</body>
+</html>
