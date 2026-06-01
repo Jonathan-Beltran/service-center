@@ -321,7 +321,7 @@
       btn.textContent = "Submitting…";
       statusEl.style.display = "none";
       try {
-        const res = await fetch("http://localhost:8000/submit_preference", {
+        const res = await fetch("/submit_preference", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ initials: currentUser, times: selections })
@@ -355,7 +355,7 @@
     async function loadWorkers() {
       const select = document.getElementById("user-select");
       try {
-        const res = await fetch("http://localhost:8000/workers");
+        const res = await fetch("/workers");
         if (!res.ok) throw new Error();
         const workers = await res.json();
         select.innerHTML = '<option value="">— Select your initials —</option>';

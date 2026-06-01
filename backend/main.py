@@ -2,10 +2,14 @@ import os
 import secrets
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import List
 from schedule import schedule
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
 
 
 app = FastAPI()
@@ -131,3 +135,6 @@ def run_schedule(request: ScheduleRequest):
     }
 
     return schedule(data, days)
+
+
+app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="static")

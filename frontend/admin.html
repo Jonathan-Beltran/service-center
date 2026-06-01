@@ -389,7 +389,7 @@
     const errorEl = document.getElementById("login-error");
     errorEl.style.display = "none";
     try {
-      const res = await fetch("http://localhost:8000/admin/login", {
+      const res = await fetch("/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password })
@@ -533,7 +533,7 @@
 
   async function syncWorkers() {
     try {
-      await fetch("http://localhost:8000/workers", {
+      await fetch("/workers", {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify(workers)
@@ -583,7 +583,7 @@
 
   async function loadPreferences() {
     try {
-      const res = await fetch("http://localhost:8000/preferences", { headers: authHeaders() });
+      const res = await fetch("/preferences", { headers: authHeaders() });
       if (res.status === 401) { handleUnauthorized(); return; }
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
@@ -596,7 +596,7 @@
 
   async function removePref(initials) {
     try {
-      const res = await fetch(`http://localhost:8000/preferences/${initials}`, { method: "DELETE", headers: authHeaders() });
+      const res = await fetch(`/preferences/${initials}`, { method: "DELETE", headers: authHeaders() });
       if (res.status === 401) { handleUnauthorized(); return; }
     } catch { /* ignore network errors */ }
     preferences = preferences.filter(p => p.initials !== initials);
@@ -607,7 +607,7 @@
     if (preferences.length === 0) return;
     if (!confirm("Clear all submitted preferences?")) return;
     try {
-      const res = await fetch("http://localhost:8000/preferences", { method: "DELETE", headers: authHeaders() });
+      const res = await fetch("/preferences", { method: "DELETE", headers: authHeaders() });
       if (res.status === 401) { handleUnauthorized(); return; }
     } catch { /* ignore network errors */ }
     preferences = [];
@@ -647,7 +647,7 @@
     statusEl.className = "status";
 
     try {
-      const res = await fetch("http://localhost:8000/run_schedule", {
+      const res = await fetch("/run_schedule", {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify(payload)
@@ -674,7 +674,7 @@
       document.getElementById("results-card").scrollIntoView({ behavior: "smooth" });
 
     } catch (err) {
-      showStatus(`Request failed: ${err.message}. Make sure the backend is running on http://localhost:8000.`, "error");
+      showStatus(`Request failed: ${err.message}. Make sure the backend is running on .`, "error");
     } finally {
       btn.disabled = false;
       btn.textContent = "Run Schedule";
