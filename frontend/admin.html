@@ -273,6 +273,57 @@
       font-size: 0.72rem;
     }
     .empty-slot { color: #ccc; }
+
+    /* Scheduling period */
+    .period-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 10px;
+      align-items: end;
+    }
+    .period-row input[type="date"] {
+      width: 100%;
+      font-size: 0.9rem;
+      padding: 7px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    .week-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .week-pill {
+      background: #f0f4ff;
+      color: #3b5bdb;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .period-status { font-size: 0.82rem; color: #555; margin-top: 8px; }
+
+    /* Per-week submission chips */
+    .pref-item { flex-wrap: wrap; gap: 6px; }
+    .pref-weeks { display: flex; flex-wrap: wrap; gap: 4px; }
+    .week-chip {
+      font-size: 0.72rem;
+      border-radius: 4px;
+      padding: 2px 7px;
+      background: #d3f9d8;
+      color: #2b8a3e;
+      white-space: nowrap;
+    }
+    .week-chip.missing { background: #f1f3f5; color: #aaa; }
+    .pref-summary { font-size: 0.85rem; color: #555; margin-bottom: 8px; }
+    .pref-missing { font-size: 0.82rem; color: #b08300; background: #fffbe6; padding: 8px 12px; border-radius: 6px; margin-top: 8px; }
+
+    /* Per-week results */
+    .week-result { margin-bottom: 22px; }
+    .week-result:last-child { margin-bottom: 0; }
+    .week-result h3 { font-size: 0.95rem; margin-bottom: 8px; }
+    .week-result .week-error {
+      background: #ffe3e3; color: #c92a2a; border: 1px solid #ffc9c9;
+      padding: 8px 12px; border-radius: 6px; font-size: 0.82rem; margin-bottom: 8px;
+    }
+    .week-result .week-error ul { margin-top: 4px; padding-left: 18px; }
+    .results-note { font-size: 0.82rem; color: #777; margin-bottom: 12px; }
   </style>
 </head>
 <body>
@@ -287,6 +338,27 @@
 </div>
 
 <h1>Supervisor Panel</h1>
+
+<!-- SCHEDULING PERIOD -->
+<div class="card">
+  <h2>Scheduling Period</h2>
+  <div class="section-label">Workers can submit shift preferences for every week in this range.</div>
+  <div class="period-row">
+    <div class="field-group">
+      <label>Start (week of)</label>
+      <input type="date" id="period-start">
+    </div>
+    <div class="field-group">
+      <label>End</label>
+      <input type="date" id="period-end">
+    </div>
+    <div>
+      <button class="btn btn-primary" onclick="savePeriod()">Save Period</button>
+    </div>
+  </div>
+  <div class="week-list" id="week-list"><span class="empty-msg">No scheduling period set. Workers cannot submit yet.</span></div>
+  <div class="period-status" id="period-status"></div>
+</div>
 
 <!-- SCHEDULE SETTINGS -->
 <div class="card">
@@ -360,19 +432,20 @@
     <button class="btn btn-ghost" onclick="clearPreferences()">Clear All</button>
   </div>
   <div class="pref-list" id="pref-list" style="margin-top:12px;">
-    <p class="empty-msg">Click Refresh to load submitted preferences.</p>
+    <p class="empty-msg">Loading submitted preferences…</p>
   </div>
 </div>
 
 <!-- RUN -->
-<button class="btn-run" id="run-btn" onclick="runSchedule()">Run Schedule</button>
+<button class="btn-run" id="run-btn" onclick="runSchedule()">Run Schedule for All Weeks</button>
 
 <div class="status" id="status-msg"></div>
 
 <!-- RESULTS -->
 <div class="card" id="results-card" style="display:none">
   <h2>Schedule Results</h2>
-  <div class="result-scroll" id="result-grid"></div>
+  <div class="results-note" id="results-note"></div>
+  <div id="result-grid"></div>
 </div>
 
 <script>
@@ -399,7 +472,7 @@
       adminToken = data.token;
       sessionStorage.setItem("adminToken", adminToken);
       document.getElementById("login-overlay").style.display = "none";
-      loadPreferences();
+      loadAll();
     } catch {
       errorEl.textContent = "Could not reach server.";
       errorEl.style.display = "block";
@@ -433,8 +506,72 @@
   const DEFAULT_WEEKDAYS = [1, 1, 2, 3, 3, 3, 2, 2];
   const DEFAULT_WEEKENDS = [1, 1, 1, 2, 2, 2, 2, 2];
 
-  let workers = [];    // { initials, points, doubles }
-  let preferences = []; // { initials, times }
+  let workers = [];     // { initials, points, doubles }
+  let preferences = []; // { initials, weeks: { isoMonday: [[day, shift], ...] } }
+  let weeks = [];       // ISO date of each Monday in the scheduling period
+
+  // ── Date helpers ──────────────────────────────────────────────────────────
+
+  function parseISO(iso) {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+  function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
+  function shortDate(date) { return date.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
+  function numericDate(date) { return `${date.getMonth() + 1}/${date.getDate()}`; }
+  function weekLabel(iso) { const s = parseISO(iso); return `${shortDate(s)} – ${shortDate(addDays(s, 6))}`; }
+  function toISO(date) {
+    const p = n => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
+  }
+
+  // ── Scheduling period ─────────────────────────────────────────────────────
+
+  function renderWeeks() {
+    const list = document.getElementById("week-list");
+    if (weeks.length === 0) {
+      list.innerHTML = '<span class="empty-msg">No scheduling period set. Workers cannot submit yet.</span>';
+      return;
+    }
+    list.innerHTML = weeks.map(w => `<span class="week-pill">Week of ${weekLabel(w)}</span>`).join("");
+  }
+
+  async function loadWeeks() {
+    try {
+      const res = await fetch("/weeks");
+      if (!res.ok) throw new Error();
+      weeks = (await res.json()).weeks || [];
+    } catch { weeks = []; }
+    if (weeks.length > 0) {
+      document.getElementById("period-start").value = weeks[0];
+      document.getElementById("period-end").value = toISO(addDays(parseISO(weeks[weeks.length - 1]), 6));
+    }
+    renderWeeks();
+  }
+
+  async function savePeriod() {
+    const start = document.getElementById("period-start").value;
+    const end = document.getElementById("period-end").value;
+    const statusEl = document.getElementById("period-status");
+    if (!start || !end) { statusEl.textContent = "Pick both a start and an end date."; return; }
+    if (preferences.length > 0 && weeks.length > 0) {
+      if (!confirm("Changing the period will drop any submitted preferences for weeks that fall outside the new range. Continue?")) return;
+    }
+    try {
+      const res = await fetch("/weeks", { method: "PUT", headers: authHeaders(), body: JSON.stringify({ start, end }) });
+      if (res.status === 401) { handleUnauthorized(); return; }
+      const data = await res.json();
+      if (!res.ok) { statusEl.textContent = data?.detail || `Server error ${res.status}`; return; }
+      weeks = data.weeks;
+      renderWeeks();
+      statusEl.textContent = `Saved. ${weeks.length} week${weeks.length !== 1 ? "s" : ""} open for workers.`;
+      setTimeout(() => { statusEl.textContent = ""; }, 4000);
+      loadPreferences();
+      loadResults();
+    } catch (err) {
+      statusEl.textContent = `Could not save: ${err.message}`;
+    }
+  }
 
   // ── Build capacity grids ──────────────────────────────────────────────────
 
@@ -474,6 +611,51 @@
 
   function getCapacities(gridId) {
     return SHIFT_LABELS.map((_, i) => parseInt(document.getElementById(`${gridId}-${i}`).value) || 0);
+  }
+
+  function currentSettings() {
+    return {
+      weekdays: getCapacities("weekday-grid"),
+      weekends: getCapacities("weekend-grid"),
+      yellows: document.getElementById("yellows").checked
+    };
+  }
+
+  async function loadSettings() {
+    try {
+      const res = await fetch("/settings");
+      if (!res.ok) return;
+      const s = await res.json();
+      buildGrid("weekday-grid", s.weekdays || DEFAULT_WEEKDAYS);
+      buildGrid("weekend-grid", s.weekends || DEFAULT_WEEKENDS);
+      document.getElementById("yellows").checked = !!s.yellows;
+      updateYellowHighlight();
+      document.getElementById("weekday-grid-0").addEventListener("input", () => syncGraveCapacity("weekday-grid"));
+      document.getElementById("weekend-grid-0").addEventListener("input", () => syncGraveCapacity("weekend-grid"));
+    } catch { /* keep defaults */ }
+  }
+
+  let settingsTimer = null;
+  function scheduleSettingsSave() {
+    clearTimeout(settingsTimer);
+    settingsTimer = setTimeout(async () => {
+      try {
+        const res = await fetch("/settings", { method: "PUT", headers: authHeaders(), body: JSON.stringify(currentSettings()) });
+        if (res.status === 401) handleUnauthorized();
+      } catch { /* non-critical */ }
+    }, 500);
+  }
+  document.getElementById("weekday-grid").addEventListener("input", scheduleSettingsSave);
+  document.getElementById("weekend-grid").addEventListener("input", scheduleSettingsSave);
+  document.getElementById("yellows").addEventListener("change", scheduleSettingsSave);
+
+  async function loadWorkers() {
+    try {
+      const res = await fetch("/workers");
+      if (!res.ok) return;
+      workers = await res.json();
+      renderWorkers();
+    } catch { /* keep empty */ }
   }
 
   // ── Workers ───────────────────────────────────────────────────────────────
@@ -573,12 +755,36 @@
       list.innerHTML = '<p class="empty-msg">No preferences submitted yet.</p>';
       return;
     }
-    list.innerHTML = preferences.map((p, i) => `
+
+    const submittedSet = new Set(preferences.map(p => p.initials));
+    const notSubmitted = workers.map(w => w.initials).filter(i => !submittedSet.has(i));
+    const summary = workers.length > 0
+      ? `<div class="pref-summary"><strong>${submittedSet.size}</strong> of <strong>${workers.length}</strong> workers have submitted.</div>`
+      : "";
+
+    const sorted = [...preferences].sort((a, b) => a.initials.localeCompare(b.initials));
+    const items = sorted.map(p => {
+      const chips = weeks.map(w => {
+        const n = (p.weeks[w] || []).length;
+        const label = shortDate(parseISO(w));
+        return n > 0
+          ? `<span class="week-chip" title="Week of ${weekLabel(w)}">${label}: ${n}</span>`
+          : `<span class="week-chip missing" title="Week of ${weekLabel(w)}">${label}: —</span>`;
+      }).join("");
+      const done = weeks.filter(w => (p.weeks[w] || []).length > 0).length;
+      return `
       <div class="pref-item">
-        <span><span class="initials">${p.initials}</span><span class="count">${p.times.length} shift${p.times.length !== 1 ? "s" : ""} selected</span></span>
+        <span><span class="initials">${p.initials}</span><span class="count">${done}/${weeks.length} weeks</span></span>
+        <span class="pref-weeks">${chips}</span>
         <button class="btn btn-danger sm" onclick="removePref('${p.initials}')">Remove</button>
-      </div>
-    `).join("");
+      </div>`;
+    }).join("");
+
+    const missing = notSubmitted.length > 0
+      ? `<div class="pref-missing">Not yet submitted: ${notSubmitted.join(", ")}</div>`
+      : "";
+
+    list.innerHTML = summary + items + missing;
   }
 
   async function loadPreferences() {
@@ -587,7 +793,7 @@
       if (res.status === 401) { handleUnauthorized(); return; }
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
-      preferences = data.map(p => ({ initials: p.initials, times: p.times }));
+      preferences = data.map(p => ({ initials: p.initials, weeks: p.weeks || {} }));
       renderPreferences();
     } catch (err) {
       alert(`Could not load preferences: ${err.message}`);
@@ -620,27 +826,9 @@
     const btn = document.getElementById("run-btn");
     const statusEl = document.getElementById("status-msg");
 
+    if (weeks.length === 0) { showStatus("Set the scheduling period before running.", "error"); return; }
     if (workers.length === 0) { showStatus("Add at least one worker before running.", "error"); return; }
-    if (preferences.length === 0) { showStatus("Add at least one worker preference before running.", "error"); return; }
-
-    const weekdays = getCapacities("weekday-grid");
-    const weekends = getCapacities("weekend-grid");
-    const yellows = document.getElementById("yellows").checked;
-
-    const payload = {
-      worker_preferences: preferences.map(p => ({
-        worker_initials: p.initials,
-        times: p.times
-      })),
-      admin_settings: {
-        weekdays,
-        weekends,
-        yellows,
-        doublesRecipients: workers.filter(w => w.doubles).map(w => w.initials),
-        all_initials: workers.map(w => w.initials),
-        priority_points: workers.map(w => w.points)
-      }
-    };
+    if (preferences.length === 0) { showStatus("No workers have submitted preferences yet.", "error"); return; }
 
     btn.disabled = true;
     btn.textContent = "Running…";
@@ -650,7 +838,7 @@
       const res = await fetch("/run_schedule", {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify(payload)
+        body: JSON.stringify(currentSettings())
       });
 
       if (res.status === 401) { handleUnauthorized(); return; }
@@ -662,23 +850,35 @@
         return;
       }
 
-      if (data?.error) {
-        renderResults(data.schedule, yellows);
-        showStatus("Could not fill all required slots:", "error", data.unfilled);
-        document.getElementById("results-card").scrollIntoView({ behavior: "smooth" });
-        return;
+      renderResults(data.weeks, currentSettings().yellows, `Generated ${new Date().toLocaleString()}.`);
+      const failed = data.weeks.filter(w => w.error);
+      if (failed.length > 0) {
+        showStatus(`Could not fill all required slots in ${failed.length} of ${data.weeks.length} weeks. See details below.`, "error");
+      } else {
+        showStatus(`Schedules generated for all ${data.weeks.length} weeks.`, "success");
       }
-
-      renderResults(data, yellows);
-      showStatus("Schedule generated successfully.", "success");
       document.getElementById("results-card").scrollIntoView({ behavior: "smooth" });
 
     } catch (err) {
-      showStatus(`Request failed: ${err.message}. Make sure the backend is running on .`, "error");
+      showStatus(`Request failed: ${err.message}.`, "error");
     } finally {
       btn.disabled = false;
-      btn.textContent = "Run Schedule";
+      btn.textContent = "Run Schedule for All Weeks";
     }
+  }
+
+  async function loadResults() {
+    try {
+      const res = await fetch("/results", { headers: authHeaders() });
+      if (res.status === 401) { handleUnauthorized(); return; }
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.weeks && data.weeks.length > 0) {
+        renderResults(data.weeks, currentSettings().yellows, "Results from the last run. Run again to refresh.");
+      } else {
+        document.getElementById("results-card").style.display = "none";
+      }
+    } catch { /* ignore */ }
   }
 
   function showStatus(msg, type, items = []) {
@@ -693,39 +893,54 @@
 
   // ── Render Results ────────────────────────────────────────────────────────
 
-  function renderResults(schedule, yellows) {
+  function renderResults(weekResults, yellows, note) {
     const card = document.getElementById("results-card");
     const grid = document.getElementById("result-grid");
     card.style.display = "block";
+    document.getElementById("results-note").textContent = note || "";
 
-    // schedule[dayIndex][shiftIndex] = [initials, ...]
-    let html = `<table class="result-table">
-      <thead><tr><th>Shift</th>${DAY_LABELS.map(d => `<th>${d}</th>`).join("")}</tr></thead>
-      <tbody>`;
+    grid.innerHTML = weekResults.map(w => {
+      const monday = parseISO(w.week);
+      const schedule = w.schedule;
 
-    SHIFT_LABELS.forEach((shiftLabel, si) => {
-      const isYellow = yellows && YELLOW_SHIFTS.includes(si);
-      html += `<tr><td class="shift-label${isYellow ? " yellow" : ""}">${shiftLabel}</td>`;
+      let html = `<div class="week-result"><h3>Week of ${weekLabel(w.week)}</h3>`;
+      if (w.error) {
+        html += `<div class="week-error">Could not fill all required slots:<ul>${w.unfilled.map(u => `<li>${u}</li>`).join("")}</ul></div>`;
+      }
 
-      DAY_LABELS.forEach((_, di) => {
-        const assigned = schedule[di]?.[si] ?? [];
-        if (assigned.length > 0) {
-          html += `<td><div class="chips">${assigned.map(n => `<span class="chip">${n}</span>`).join("")}</div></td>`;
-        } else {
-          html += `<td><span class="empty-slot">—</span></td>`;
-        }
+      html += `<div class="result-scroll"><table class="result-table">
+        <thead><tr><th>Shift</th>${DAY_LABELS.map((d, i) => `<th>${d} ${numericDate(addDays(monday, i))}</th>`).join("")}</tr></thead>
+        <tbody>`;
+
+      SHIFT_LABELS.forEach((shiftLabel, si) => {
+        const isYellow = yellows && YELLOW_SHIFTS.includes(si);
+        html += `<tr><td class="shift-label${isYellow ? " yellow" : ""}">${shiftLabel}</td>`;
+        DAY_LABELS.forEach((_, di) => {
+          const assigned = schedule[di]?.[si] ?? [];
+          if (assigned.length > 0) {
+            html += `<td><div class="chips">${assigned.map(n => `<span class="chip">${n}</span>`).join("")}</div></td>`;
+          } else {
+            html += `<td><span class="empty-slot">—</span></td>`;
+          }
+        });
+        html += "</tr>";
       });
 
-      html += "</tr>";
-    });
-
-    html += "</tbody></table>";
-    grid.innerHTML = html;
+      html += "</tbody></table></div></div>";
+      return html;
+    }).join("");
   }
 
-  // Init
+  // Init — everything lives on the server so the panel survives reloads and restarts
+  async function loadAll() {
+    await Promise.all([loadWeeks(), loadSettings(), loadWorkers()]);
+    if (!adminToken) return;
+    await loadPreferences();
+    await loadResults();
+  }
+
   renderWorkers();
-  loadPreferences();
+  loadAll();
 </script>
 </body>
 </html>

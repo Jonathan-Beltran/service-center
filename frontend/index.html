@@ -8,7 +8,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: sans-serif; padding: 24px; background: #f5f5f5; color: #222; }
 
-    header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    header { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
     h1 { font-size: 1.3rem; }
 
     select {
@@ -18,6 +18,49 @@
       border: 1px solid #ccc;
       background: white;
       cursor: pointer;
+    }
+
+    /* Week tabs */
+    .week-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .week-tab {
+      position: relative;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      background: white;
+      color: #444;
+      border: 2px solid #e0e0e0;
+      cursor: pointer;
+      transition: border-color 0.12s, background 0.12s;
+    }
+    .week-tab:hover { border-color: #b8c4f0; }
+    .week-tab.active { background: #3b5bdb; color: white; border-color: #2f4ac7; }
+    .week-tab .count {
+      display: inline-block;
+      margin-left: 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      background: #e9ecef;
+      color: #555;
+      border-radius: 10px;
+      padding: 1px 7px;
+    }
+    .week-tab.active .count { background: white; color: #3b5bdb; }
+    .week-tab.has-picks:not(.active) .count { background: #d3f9d8; color: #2b8a3e; }
+
+    .notice {
+      background: white;
+      border-radius: 8px;
+      padding: 18px;
+      font-size: 0.9rem;
+      color: #555;
+      border: 1px solid #e0e0e0;
     }
 
     .week { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -38,6 +81,7 @@
       padding-bottom: 7px;
       border-bottom: 2px solid #e0e0e0;
     }
+    .day h2 .date { color: #888; font-weight: 500; font-size: 0.8rem; margin-left: 4px; }
 
     .shift {
       position: relative;
@@ -94,12 +138,21 @@
       border: 1px solid #e0e0e0;
       line-height: 1.8;
     }
+    .output-box .week-heading {
+      font-weight: 700;
+      font-size: 0.82rem;
+      color: #3b5bdb;
+      margin-top: 8px;
+    }
+    .output-box .week-heading:first-child { margin-top: 0; }
+    .output-box .none { color: #aaa; font-style: italic; }
 
     .btn-row {
       display: flex;
       gap: 10px;
       margin-top: 10px;
       align-items: center;
+      flex-wrap: wrap;
     }
 
     .copy-btn {
@@ -143,10 +196,20 @@
     @media (max-width: 640px) {
       body { padding: 14px; }
 
-      header { flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 16px; }
+      header { flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 14px; }
       h1 { font-size: 1.15rem; }
       select { width: 100%; font-size: 0.95rem; }
       .hint { margin-left: 0; }
+
+      .week-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-bottom: 2px;
+      }
+      .week-tabs::-webkit-scrollbar { display: none; }
+      .week-tab { flex-shrink: 0; }
 
       .day-tabs {
         display: flex;
@@ -191,17 +254,22 @@
     <select id="user-select">
       <option value="">— Loading… —</option>
     </select>
-    <span class="hint">Click shifts in order of preference</span>
+    <span class="hint">Pick a week, then click shifts in order of preference</span>
   </header>
 
-  <div class="day-tabs" id="day-tabs"></div>
-  <div class="week no-user" id="week"></div>
+  <div class="week-tabs" id="week-tabs"></div>
+  <div class="notice" id="notice" style="display:none"></div>
+
+  <div id="picker">
+    <div class="day-tabs" id="day-tabs"></div>
+    <div class="week no-user" id="week"></div>
+  </div>
 
   <div class="output-section">
     <h2>Your selections</h2>
     <div class="output-box" id="output">Select your initials to begin.</div>
     <div class="btn-row">
-      <button class="submit-btn" id="submit-btn" onclick="submitPreference()">Submit</button>
+      <button class="submit-btn" id="submit-btn" onclick="submitPreference()">Submit all weeks</button>
       <button class="copy-btn" id="copy-btn" onclick="copyOutput()">Copy</button>
       <span class="submit-status" id="submit-status" style="display:none"></span>
     </div>
@@ -222,22 +290,74 @@
       "9pm – 12am"
     ];
 
-    // selections: ordered list of [dayIndex, shiftIndex]
-    let selections = [];
+    let weeks = [];          // ISO dates of each Monday, from the server
+    let activeWeek = null;   // ISO date of the week being edited
+    let selections = {};     // week -> ordered list of [dayIndex, shiftIndex]
     let currentUser = "";
+
+    // ── Date helpers ────────────────────────────────────────────────────────
+
+    function parseISO(iso) {
+      const [y, m, d] = iso.split("-").map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    function addDays(date, n) {
+      const d = new Date(date);
+      d.setDate(d.getDate() + n);
+      return d;
+    }
+
+    function shortDate(date) {
+      return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    }
+
+    function numericDate(date) {
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    }
+
+    function weekLabel(iso) {
+      const start = parseISO(iso);
+      return `${shortDate(start)} – ${shortDate(addDays(start, 6))}`;
+    }
+
+    function currentPicks() {
+      if (!activeWeek) return [];
+      if (!selections[activeWeek]) selections[activeWeek] = [];
+      return selections[activeWeek];
+    }
+
+    // ── Rendering ───────────────────────────────────────────────────────────
+
+    function renderWeekTabs() {
+      const container = document.getElementById("week-tabs");
+      container.innerHTML = "";
+      weeks.forEach(iso => {
+        const count = (selections[iso] || []).length;
+        const btn = document.createElement("button");
+        btn.className = "week-tab" + (iso === activeWeek ? " active" : "") + (count > 0 ? " has-picks" : "");
+        btn.innerHTML = `Week of ${shortDate(parseISO(iso))}<span class="count">${count}</span>`;
+        btn.onclick = () => { activeWeek = iso; renderWeekTabs(); renderWeek(); };
+        container.appendChild(btn);
+      });
+    }
 
     function renderWeek() {
       const week = document.getElementById("week");
       week.innerHTML = "";
+      if (!activeWeek) return;
+
+      const monday = parseISO(activeWeek);
+      const picks = currentPicks();
 
       days.forEach((day, dayIndex) => {
         const dayEl = document.createElement("div");
         dayEl.className = "day";
-        dayEl.innerHTML = `<h2>${day}</h2>`;
+        dayEl.innerHTML = `<h2>${day}<span class="date">${numericDate(addDays(monday, dayIndex))}</span></h2>`;
 
         shifts.forEach((shift, shiftIndex) => {
           if (shift === null) return; // skip 3am-6am (system only)
-          const rank = selections.findIndex(s => s[0] === dayIndex && s[1] === shiftIndex);
+          const rank = picks.findIndex(s => s[0] === dayIndex && s[1] === shiftIndex);
           const isSelected = rank !== -1;
 
           const shiftEl = document.createElement("div");
@@ -281,12 +401,14 @@
     }
 
     function toggleShift(dayIndex, shiftIndex) {
-      const idx = selections.findIndex(s => s[0] === dayIndex && s[1] === shiftIndex);
+      const picks = currentPicks();
+      const idx = picks.findIndex(s => s[0] === dayIndex && s[1] === shiftIndex);
       if (idx !== -1) {
-        selections.splice(idx, 1);
+        picks.splice(idx, 1);
       } else {
-        selections.push([dayIndex, shiftIndex]);
+        picks.push([dayIndex, shiftIndex]);
       }
+      renderWeekTabs();
       renderWeek();
     }
 
@@ -296,17 +418,32 @@
         out.textContent = "Select your initials to begin.";
         return;
       }
-      if (selections.length === 0) {
+      if (weeks.length === 0) {
+        out.textContent = "No weeks are open for scheduling yet.";
+        return;
+      }
+      const totalPicks = weeks.reduce((n, w) => n + (selections[w] || []).length, 0);
+      if (totalPicks === 0) {
         out.textContent = "No shifts selected yet.";
         return;
       }
-      out.innerHTML = selections
-        .map((s, i) => `<span style="color:#888;font-size:0.78rem">${i + 1}.</span> ${days[s[0]]} &nbsp;<strong>${shifts[s[1]] ?? "3am – 6am"}</strong>`)
-        .join("<br>");
+      out.innerHTML = weeks.map(w => {
+        const picks = selections[w] || [];
+        const monday = parseISO(w);
+        const lines = picks.length === 0
+          ? `<span class="none">No shifts selected</span>`
+          : picks.map((s, i) =>
+              `<span style="color:#888;font-size:0.78rem">${i + 1}.</span> ${days[s[0]]} ${numericDate(addDays(monday, s[0]))} &nbsp;<strong>${shifts[s[1]] ?? "3am – 6am"}</strong>`
+            ).join("<br>");
+        return `<div class="week-heading">Week of ${weekLabel(w)}</div>${lines}`;
+      }).join("");
     }
 
     function copyOutput() {
-      const text = document.getElementById("output").textContent;
+      const out = document.getElementById("output");
+      const text = Array.from(out.childNodes)
+        .map(n => n.innerText ?? n.textContent)
+        .join("\n");
       navigator.clipboard.writeText(text).then(() => {
         const btn = document.getElementById("copy-btn");
         btn.textContent = "Copied!";
@@ -314,21 +451,42 @@
       });
     }
 
+    // ── Server I/O ──────────────────────────────────────────────────────────
+
     async function submitPreference() {
-      if (!currentUser || selections.length === 0) return;
+      if (!currentUser || weeks.length === 0) return;
+
+      const emptyWeeks = weeks.filter(w => (selections[w] || []).length === 0);
+      if (emptyWeeks.length === weeks.length) {
+        alert("Select at least one shift before submitting.");
+        return;
+      }
+      if (emptyWeeks.length > 0) {
+        const list = emptyWeeks.map(w => `  • Week of ${weekLabel(w)}`).join("\n");
+        if (!confirm(`You have no shifts selected for:\n${list}\n\nSubmit anyway?`)) return;
+      }
+
       const btn = document.getElementById("submit-btn");
       const statusEl = document.getElementById("submit-status");
       btn.disabled = true;
       btn.textContent = "Submitting…";
       statusEl.style.display = "none";
+
+      const payload = { initials: currentUser, weeks: {} };
+      weeks.forEach(w => { payload.weeks[w] = selections[w] || []; });
+
       try {
         const res = await fetch("/submit_preference", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ initials: currentUser, times: selections })
+          body: JSON.stringify(payload)
         });
-        if (!res.ok) throw new Error(`Server error ${res.status}`);
-        statusEl.textContent = "Submitted!";
+        if (!res.ok) {
+          let detail = `Server error ${res.status}`;
+          try { detail = (await res.json()).detail || detail; } catch {}
+          throw new Error(detail);
+        }
+        statusEl.textContent = "Submitted! You can come back and change your picks any time.";
         statusEl.className = "submit-status ok";
       } catch (err) {
         statusEl.textContent = err.message;
@@ -336,20 +494,34 @@
       } finally {
         statusEl.style.display = "";
         btn.disabled = false;
-        btn.textContent = "Submit";
-        setTimeout(() => { statusEl.style.display = "none"; }, 3000);
+        btn.textContent = "Submit all weeks";
+        setTimeout(() => { statusEl.style.display = "none"; }, 4000);
       }
     }
 
-    document.getElementById("user-select").addEventListener("change", function () {
+    async function loadExistingSelections(initials) {
+      selections = {};
+      try {
+        const res = await fetch(`/preferences/${encodeURIComponent(initials)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        Object.entries(data.weeks || {}).forEach(([w, times]) => {
+          if (weeks.includes(w)) selections[w] = times;
+        });
+      } catch { /* start fresh */ }
+    }
+
+    document.getElementById("user-select").addEventListener("change", async function () {
       currentUser = this.value;
-      selections = [];
       const week = document.getElementById("week");
       if (currentUser) {
+        await loadExistingSelections(currentUser);
         week.classList.remove("no-user");
       } else {
+        selections = {};
         week.classList.add("no-user");
       }
+      renderWeekTabs();
       renderWeek();
     });
 
@@ -374,9 +546,33 @@
       }
     }
 
+    async function loadWeeks() {
+      const notice = document.getElementById("notice");
+      const picker = document.getElementById("picker");
+      try {
+        const res = await fetch("/weeks");
+        if (!res.ok) throw new Error();
+        weeks = (await res.json()).weeks || [];
+      } catch {
+        weeks = [];
+      }
+      if (weeks.length === 0) {
+        notice.textContent = "The supervisor has not opened a scheduling period yet. Check back later.";
+        notice.style.display = "block";
+        picker.style.display = "none";
+        document.getElementById("submit-btn").disabled = true;
+      } else {
+        notice.style.display = "none";
+        picker.style.display = "";
+        activeWeek = weeks[0];
+      }
+      renderWeekTabs();
+      renderWeek();
+    }
+
     loadWorkers();
+    loadWeeks();
     initDayTabs();
-    renderWeek();
   </script>
 </body>
 </html>

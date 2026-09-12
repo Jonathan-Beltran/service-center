@@ -10,3 +10,17 @@ Frontend
   Open both files directly in your browser:
   - frontend/index.html — the worker shift picker
   - frontend/admin.html — the admin panel
+How scheduling works
+  1. Supervisor opens admin.html, sets the Scheduling Period (start and end dates).
+     Every Monday-to-Sunday week in that range is opened for workers.
+  2. Workers open index.html, pick their initials, and rank shifts for each week
+     using the week tabs. Coming back later reloads what they already submitted.
+  3. Days later, the supervisor opens admin.html, checks who has submitted, and
+     clicks "Run Schedule for All Weeks". One schedule is produced per week and
+     saved, so it is still there on the next visit.
+
+Persistence
+  All state (workers, shift sizes, period, submissions, results) is saved to a
+  JSON file. Default: backend/store.json. Override with DATA_FILE.
+  On Railway, attach a volume and set DATA_FILE=/data/store.json so submissions
+  survive redeploys and restarts.
