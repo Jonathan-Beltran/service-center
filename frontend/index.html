@@ -649,12 +649,24 @@
       renderPosted();
     });
 
-    async function loadWorkers() {
+    async function loadPublished() {
       const select = document.getElementById("user-select");
+      const notice = document.getElementById("notice");
+      const picker = document.getElementById("picker");
+      let pub = null;
       try {
-        const res = await fetch("/workers");
-        if (!res.ok) throw new Error();
-        const workers = await res.json();
+        const res = await fetch("/published");
+        if (res.ok) pub = await res.json();
+      } catch { /* handled below */ }
+
+      weeks = pub ? (pub.weeks || []) : [];
+      const workers = pub ? (pub.workers || []) : [];
+
+      if (!pub) {
+        select.innerHTML = '<option value="">— Could not load —</option>';
+      } else if (workers.length === 0) {
+        select.innerHTML = '<option value="">— No workers yet —</option>';
+      } else {
         select.innerHTML = '<option value="">— Select your initials —</option>';
         workers.forEach(w => {
           const opt = document.createElement("option");
@@ -662,40 +674,26 @@
           opt.textContent = w.initials;
           select.appendChild(opt);
         });
-        if (workers.length === 0) {
-          select.innerHTML = '<option value="">— No workers added yet —</option>';
-        }
-      } catch {
-        select.innerHTML = '<option value="">— Could not load workers —</option>';
       }
-    }
 
-    async function loadWeeks() {
-      const notice = document.getElementById("notice");
-      const picker = document.getElementById("picker");
-      try {
-        const res = await fetch("/weeks");
-        if (!res.ok) throw new Error();
-        weeks = (await res.json()).weeks || [];
-      } catch {
-        weeks = [];
-      }
       if (weeks.length === 0) {
-        notice.textContent = "The supervisor has not opened a scheduling period yet. Check back later.";
+        notice.textContent = pub
+          ? "The supervisor has not created the schedule yet. Check back later."
+          : "Could not reach the server. Try again in a moment.";
         notice.style.display = "block";
         picker.style.display = "none";
         document.getElementById("submit-btn").disabled = true;
       } else {
         notice.style.display = "none";
         picker.style.display = "";
+        document.getElementById("submit-btn").disabled = false;
         activeWeek = weeks[0];
       }
       renderWeekTabs();
       renderWeek();
     }
 
-    loadWorkers();
-    loadWeeks();
+    loadPublished();
     loadPosted();
     initDayTabs();
     if (new URLSearchParams(location.search).get("view") === "schedule") showView("schedule");

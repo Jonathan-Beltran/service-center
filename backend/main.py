@@ -2,8 +2,9 @@ import os
 import json
 import secrets
 import threading
+from copy import deepcopy
 from datetime import date, datetime, timedelta, timezone
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -54,14 +55,18 @@ def admin_login(body: LoginRequest):
 
 # ── Persistent store ──────────────────────────────────────────────────────────
 #
+# A "schedule setup" is {start, end, weeks, settings, workers}:
+#   start/end  ISO dates chosen by the supervisor
+#   weeks      ISO date of every Monday in that range (computed)
+#   settings   {"weekdays": [8 ints], "weekends": [8 ints], "yellows": bool}
+#   workers    [{"initials", "points", "doubles"}, ...]
+#
 # store = {
-#   "workers":     [{"initials": "HM", "points": 8516.38, "doubles": false}, ...],
-#   "settings":    {"weekdays": [..8 ints..], "weekends": [..8 ints..], "yellows": bool},
-#   "weeks":       ["2026-09-21", "2026-09-28", ...]          # ISO date of each Monday
-#   "preferences": {"HM": {"2026-09-21": [[day, shift], ...], ...}, ...},
-#   "published":   {"created_at": iso datetime, "yellows": bool,
-#                   "weeks": [{"week": iso, "error": bool, "unfilled": [...], "schedule": grid}, ...]}
-#                  -- the schedule workers can see; None until Create Schedule is pressed
+#   "draft":          setup being edited on the Create Schedule tab (supervisor only)
+#   "published":      setup workers see, plus "created_at"; None until Create Schedule
+#   "preferences":    {"HM": {"2026-09-21": [[day, shift], ...], ...}, ...}
+#   "results":        last run of the algorithm, supervisor only: {"run_at", "weeks": [...]}
+#   "posted_results": results workers can see: {"posted_at", "weeks": [...]}; None until posted
 # }
 
 DEFAULT_SETTINGS = {
@@ -70,13 +75,16 @@ DEFAULT_SETTINGS = {
     "yellows": True,
 }
 
+def _empty_setup() -> dict:
+    return {"start": None, "end": None, "weeks": [], "settings": deepcopy(DEFAULT_SETTINGS), "workers": []}
+
 def _empty_store() -> dict:
     return {
-        "workers": [],
-        "settings": dict(DEFAULT_SETTINGS),
-        "weeks": [],
-        "preferences": {},
+        "draft": _empty_setup(),
         "published": None,
+        "preferences": {},
+        "results": None,
+        "posted_results": None,
     }
 
 def _load_store() -> dict:
@@ -85,7 +93,9 @@ def _load_store() -> dict:
         with open(DATA_FILE, "r") as f:
             data = json.load(f)
         if isinstance(data, dict):
-            base.update(data)
+            for key in base:
+                if key in data:
+                    base[key] = data[key]
     except (FileNotFoundError, json.JSONDecodeError):
         pass
     return base
@@ -99,87 +109,116 @@ def save_store():
         json.dump(store, f, indent=2)
     os.replace(tmp, DATA_FILE)
 
-# ── Workers ───────────────────────────────────────────────────────────────────
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
-class WorkerEntry(BaseModel):
-    initials: str
-    points: float
-    doubles: bool
-
-@app.get("/workers")
-def get_workers():
-    return store["workers"]
-
-@app.post("/workers", dependencies=[Depends(require_auth)])
-def save_workers(workers: List[WorkerEntry]):
-    with store_lock:
-        store["workers"] = [
-            {"initials": w.initials.strip().upper(), "points": w.points, "doubles": w.doubles}
-            for w in workers
-        ]
-        save_store()
-    return {"status": "ok"}
-
-# ── Shift-size settings ───────────────────────────────────────────────────────
+# ── Models ────────────────────────────────────────────────────────────────────
 
 class Settings(BaseModel):
     weekdays: List[int]
     weekends: List[int]
     yellows: bool
 
-def _validate_settings(s: Settings) -> dict:
-    if len(s.weekdays) != 8 or len(s.weekends) != 8:
-        raise HTTPException(status_code=400, detail="weekdays and weekends must each have 8 entries")
-    return s.model_dump()
+class WorkerEntry(BaseModel):
+    initials: str
+    points: float
+    doubles: bool
 
-@app.get("/settings")
-def get_settings():
-    """Shift sizes used by the last created schedule (or defaults)."""
-    return store["settings"]
-
-# ── Scheduling period (weeks) ─────────────────────────────────────────────────
+class SetupRequest(BaseModel):
+    start: Optional[date] = None
+    end: Optional[date] = None
+    settings: Settings
+    workers: List[WorkerEntry]
 
 def _monday_of(d: date) -> date:
     return d - timedelta(days=d.weekday())
 
-class WeeksRequest(BaseModel):
-    start: date
-    end: date
-
-@app.get("/weeks")
-def get_weeks():
-    return {"weeks": store["weeks"]}
-
-@app.put("/weeks", dependencies=[Depends(require_auth)])
-def set_weeks(body: WeeksRequest):
-    if body.end < body.start:
+def _weeks_between(start: Optional[date], end: Optional[date]) -> List[str]:
+    if start is None or end is None:
+        return []
+    if end < start:
         raise HTTPException(status_code=400, detail="End date must be on or after start date")
-
     weeks = []
-    cur = _monday_of(body.start)
-    last = _monday_of(body.end)
+    cur = _monday_of(start)
+    last = _monday_of(end)
     while cur <= last:
         weeks.append(cur.isoformat())
         cur += timedelta(days=7)
-
     if len(weeks) > MAX_WEEKS:
         raise HTTPException(status_code=400, detail=f"Scheduling period can cover at most {MAX_WEEKS} weeks")
+    return weeks
 
-    keep = set(weeks)
+def _build_setup(body: SetupRequest) -> dict:
+    if len(body.settings.weekdays) != 8 or len(body.settings.weekends) != 8:
+        raise HTTPException(status_code=400, detail="weekdays and weekends must each have 8 entries")
+    seen = set()
+    workers = []
+    for w in body.workers:
+        initials = w.initials.strip().upper()
+        if not initials or initials in seen:
+            continue
+        seen.add(initials)
+        workers.append({"initials": initials, "points": w.points, "doubles": w.doubles})
+    return {
+        "start": body.start.isoformat() if body.start else None,
+        "end": body.end.isoformat() if body.end else None,
+        "weeks": _weeks_between(body.start, body.end),
+        "settings": body.settings.model_dump(),
+        "workers": workers,
+    }
+
+# ── Draft (supervisor only) ───────────────────────────────────────────────────
+
+@app.get("/draft", dependencies=[Depends(require_auth)])
+def get_draft():
+    return store["draft"]
+
+@app.put("/draft", dependencies=[Depends(require_auth)])
+def put_draft(body: SetupRequest):
+    """Save the supervisor's working copy. Workers never see this."""
+    setup = _build_setup(body)
     with store_lock:
-        store["weeks"] = weeks
-        # Drop preferences and results for weeks that are no longer in the period
+        store["draft"] = setup
+        save_store()
+    return setup
+
+# ── Publish ("Create Schedule") ───────────────────────────────────────────────
+
+@app.post("/publish", dependencies=[Depends(require_auth)])
+def publish():
+    """Make the draft the live schedule that workers can see and pick shifts on."""
+    draft = store["draft"]
+    if not draft["weeks"]:
+        raise HTTPException(status_code=400, detail="Set a start and end date before creating the schedule")
+    if not draft["workers"]:
+        raise HTTPException(status_code=400, detail="Add workers before creating the schedule")
+
+    published = deepcopy(draft)
+    published["created_at"] = _now()
+    keep = set(published["weeks"])
+
+    with store_lock:
+        store["published"] = published
+        # Drop submissions and results for weeks that are no longer in the period
         for initials in list(store["preferences"]):
             by_week = {w: t for w, t in store["preferences"][initials].items() if w in keep}
             if by_week:
                 store["preferences"][initials] = by_week
             else:
                 del store["preferences"][initials]
-        if store["published"]:
-            store["published"]["weeks"] = [r for r in store["published"]["weeks"] if r["week"] in keep]
+        for key in ("results", "posted_results"):
+            if store[key]:
+                store[key]["weeks"] = [r for r in store[key]["weeks"] if r["week"] in keep]
         save_store()
+    return published
 
-    return {"weeks": weeks}
+@app.get("/published")
+def get_published():
+    """What workers see: the open weeks, the worker list, and when it was created."""
+    pub = store["published"]
+    if not pub:
+        return {"created_at": None, "weeks": [], "workers": [], "settings": None}
+    return pub
 
 # ── Worker preferences ────────────────────────────────────────────────────────
 
@@ -193,7 +232,13 @@ def submit_preference(pref: PreferenceSubmission):
     if not initials:
         raise HTTPException(status_code=400, detail="Initials are required")
 
-    open_weeks = set(store["weeks"])
+    pub = store["published"]
+    if not pub:
+        raise HTTPException(status_code=400, detail="The schedule has not been created yet")
+    if initials not in {w["initials"] for w in pub["workers"]}:
+        raise HTTPException(status_code=400, detail=f"{initials} is not on the worker list")
+
+    open_weeks = set(pub["weeks"])
     cleaned: Dict[str, List[List[int]]] = {}
     for week, times in pref.weeks.items():
         if week not in open_weeks:
@@ -238,16 +283,21 @@ def clear_preferences():
         save_store()
     return {"status": "ok"}
 
-# ── Schedule generation ───────────────────────────────────────────────────────
+# ── Run the algorithm ─────────────────────────────────────────────────────────
 
-def _generate(settings: dict) -> list:
-    """Run the scheduler for every open week using stored workers and preferences."""
-    workers = store["workers"]
-    priority_by_initials = {w["initials"]: w["points"] for w in workers}
-    doubles_recipients = {w["initials"] for w in workers if w["doubles"]}
+@app.post("/run_schedule", dependencies=[Depends(require_auth)])
+def run_schedule():
+    """Run the scheduler on the published setup and the submitted preferences."""
+    pub = store["published"]
+    if not pub:
+        raise HTTPException(status_code=400, detail="Create the schedule before running it")
+
+    settings = pub["settings"]
+    priority_by_initials = {w["initials"]: w["points"] for w in pub["workers"]}
+    doubles_recipients = {w["initials"] for w in pub["workers"] if w["doubles"]}
 
     results = []
-    for week in store["weeks"]:
+    for week in pub["weeks"]:
         entries = [
             (initials, by_week[week])
             for initials, by_week in store["preferences"].items()
@@ -273,38 +323,33 @@ def _generate(settings: dict) -> list:
             results.append({"week": week, "error": True, "unfilled": out["unfilled"], "schedule": out["schedule"]})
         else:
             results.append({"week": week, "error": False, "unfilled": [], "schedule": out})
-    return results
 
-@app.post("/preview_schedule", dependencies=[Depends(require_auth)])
-def preview_schedule(body: Settings):
-    """Dry run with the given shift sizes. Saves nothing; workers never see this."""
-    if not store["weeks"]:
-        raise HTTPException(status_code=400, detail="Set the scheduling period first")
-    settings = _validate_settings(body)
-    return {"weeks": _generate(settings)}
-
-@app.post("/create_schedule", dependencies=[Depends(require_auth)])
-def create_schedule(body: Settings):
-    """Generate the schedule, save the shift sizes, and publish it for workers."""
-    if not store["weeks"]:
-        raise HTTPException(status_code=400, detail="Set the scheduling period first")
-    settings = _validate_settings(body)
-    results = _generate(settings)
-    published = {
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "yellows": settings["yellows"],
-        "weeks": results,
-    }
+    run = {"run_at": _now(), "yellows": settings["yellows"], "weeks": results}
     with store_lock:
-        store["settings"] = settings
-        store["published"] = published
+        store["results"] = run
         save_store()
-    return published
+    return run
+
+@app.get("/results", dependencies=[Depends(require_auth)])
+def get_results():
+    return store["results"] or {"run_at": None, "yellows": False, "weeks": []}
+
+@app.post("/post_results", dependencies=[Depends(require_auth)])
+def post_results():
+    """Make the last run visible to workers."""
+    if not store["results"]:
+        raise HTTPException(status_code=400, detail="Run the schedule first")
+    posted = deepcopy(store["results"])
+    posted["posted_at"] = _now()
+    with store_lock:
+        store["posted_results"] = posted
+        save_store()
+    return posted
 
 @app.get("/schedule")
 def get_schedule():
-    """The posted schedule, visible to everyone. Empty until Create Schedule is pressed."""
-    return store["published"] or {"created_at": None, "yellows": False, "weeks": []}
+    """The final schedule workers can see. Empty until results are posted."""
+    return store["posted_results"] or {"posted_at": None, "yellows": False, "weeks": []}
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="static")

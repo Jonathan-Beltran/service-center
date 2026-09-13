@@ -11,20 +11,22 @@ Frontend
   - frontend/index.html — the worker shift picker
   - frontend/admin.html — the admin panel
 How scheduling works
-  1. Supervisor opens admin.html, sets the Scheduling Period (start and end dates).
-     Every Monday-to-Sunday week in that range is opened for workers.
-  2. Workers open index.html, pick their initials, and rank shifts for each week
-     using the week tabs. Coming back later reloads what they already submitted.
-  3. Days later, the supervisor opens the Preview Schedule tab in admin.html,
-     checks who has submitted, and reviews the preview. The preview is a dry run
-     that nobody else can see. Shift size changes on the Create Schedule tab
-     only affect the preview until the schedule is created.
-  4. Clicking "Create Schedule" saves the shift sizes and posts the schedule.
-     Workers then see it under "Posted Schedule" on index.html, with their own
-     shifts highlighted. Creating again replaces the posted schedule.
+  Supervisor panel (admin.html) has three tabs:
+  1. Create Schedule: set the period (start and end dates), shift sizes, and
+     import workers. This is a draft. It saves as you type, but workers see
+     none of it.
+  2. Preview Schedule: shows the empty schedule built from the draft. Pressing
+     "Create Schedule" publishes it. Workers can then open index.html, pick
+     their initials, and rank shifts for each week. Coming back later reloads
+     what they already submitted. Pressing Create Schedule again re-publishes
+     the draft; submissions for weeks no longer in the period are deleted.
+  3. Run Schedule: shows who has submitted, runs the algorithm on the published
+     schedule, and shows the result. Only the supervisor sees it until
+     "Post to Workers" is pressed. Workers then see it under "Posted Schedule"
+     on index.html with their own shifts highlighted.
 
 Persistence
-  All state (workers, shift sizes, period, submissions, posted schedule) is saved to a
+  All state (draft, published schedule, submissions, results) is saved to a
   JSON file. Default: backend/store.json. Override with DATA_FILE.
   On Railway, attach a volume and set DATA_FILE=/data/store.json so submissions
   survive redeploys and restarts.

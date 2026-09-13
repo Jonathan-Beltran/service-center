@@ -8,7 +8,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: sans-serif; padding: 24px; background: #f5f5f5; color: #222; }
 
-    h1 { font-size: 1.4rem; margin-bottom: 24px; }
+    h1 { font-size: 1.4rem; margin-bottom: 18px; }
     h2 { font-size: 1.05rem; font-weight: 700; margin-bottom: 14px; }
 
     .card {
@@ -18,6 +18,8 @@
       margin-bottom: 18px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
+    .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .card-head h2 { margin-bottom: 0; }
 
     .section-label {
       font-size: 0.75rem;
@@ -27,250 +29,12 @@
       letter-spacing: 0.05em;
       margin-bottom: 8px;
     }
-
+    .help-text { font-size: 0.8rem; color: #777; margin-top: 12px; }
     .divider { border: none; border-top: 1px solid #e8e8e8; margin: 16px 0; }
-
-    /* Shift capacity grid */
-    .shift-grid {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 8px;
-    }
-
-    .shift-cell { text-align: center; }
-
-    .shift-cell label {
-      display: block;
-      font-size: 0.7rem;
-      color: #666;
-      margin-bottom: 4px;
-      line-height: 1.3;
-    }
-
-    .shift-cell input {
-      width: 100%;
-      text-align: center;
-      font-size: 0.9rem;
-      padding: 6px 4px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-    }
-
-    .shift-cell.yellow label { color: #b08300; }
-    .shift-cell.yellow input { background: #fffbe6; border-color: #ffe066; }
-
-    .shift-cell.locked label { color: #aaa; }
-    .shift-cell.locked label::after { content: " (auto)"; font-style: italic; font-size: 0.65rem; }
-    .shift-cell.locked input { background: #f4f4f4; color: #aaa; cursor: not-allowed; border-color: #ddd; }
-
-    /* Yellows toggle */
-    .yellows-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-top: 14px;
-      font-size: 0.88rem;
-    }
-
-    .yellows-row input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
-
-    /* Workers table */
-    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-    th {
-      text-align: left;
-      padding: 8px 10px;
-      border-bottom: 2px solid #e8e8e8;
-      font-weight: 600;
-      font-size: 0.82rem;
-      color: #555;
-    }
-    td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; }
-    tr:last-child td { border-bottom: none; }
-    td.center { text-align: center; }
-
-    .field-group label {
-      display: block;
-      font-size: 0.78rem;
-      color: #666;
-      margin-bottom: 4px;
-    }
-
-    .field-group input[type="text"],
-    .field-group input[type="number"] {
-      width: 100%;
-      font-size: 0.9rem;
-      padding: 7px 10px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-    }
-
-    .field-group.center-field { text-align: center; }
-    .field-group.center-field input[type="checkbox"] { width: 18px; height: 18px; margin-top: 8px; cursor: pointer; }
-
-    /* Preferences */
-    textarea {
-      width: 100%;
-      font-family: monospace;
-      font-size: 0.82rem;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      resize: vertical;
-    }
-
-    .pref-actions { display: flex; gap: 10px; margin-top: 8px; }
-
-    .pref-list { margin-top: 12px; }
-
-    .pref-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 12px;
-      background: #f8f9fa;
-      border-radius: 6px;
-      margin-bottom: 6px;
-      font-size: 0.85rem;
-    }
-
-    .pref-item .initials { font-weight: 700; margin-right: 8px; }
-    .pref-item .count { color: #777; }
-
     .empty-msg { font-size: 0.85rem; color: #aaa; font-style: italic; }
 
-    /* Buttons */
-    .btn {
-      padding: 8px 16px;
-      font-size: 0.88rem;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 500;
-      white-space: nowrap;
-    }
-
-    .btn-primary { background: #3b5bdb; color: white; }
-    .btn-primary:hover { background: #2f4ac7; }
-
-    .btn-ghost { background: #e9ecef; color: #444; }
-    .btn-ghost:hover { background: #dee2e6; }
-
-    .btn-danger { background: #fff0f0; color: #c92a2a; border: 1px solid #ffc9c9; }
-    .btn-danger:hover { background: #ffe3e3; }
-    .btn-danger.sm { padding: 4px 10px; font-size: 0.78rem; }
-
-    .btn-run {
-      width: 100%;
-      padding: 15px;
-      font-size: 1.05rem;
-      font-weight: 700;
-      background: #2f9e44;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      margin-bottom: 18px;
-      letter-spacing: 0.02em;
-    }
-    .btn-run:hover { background: #276236; }
-    .btn-run:disabled { background: #aaa; cursor: not-allowed; }
-
-    /* Login overlay */
-    .login-overlay {
-      position: fixed;
-      inset: 0;
-      background: #f5f5f5;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-    }
-    .login-box {
-      background: white;
-      border-radius: 10px;
-      padding: 32px 28px;
-      box-shadow: 0 2px 16px rgba(0,0,0,0.12);
-      width: 100%;
-      max-width: 340px;
-    }
-    .login-box h2 { font-size: 1.1rem; margin-bottom: 18px; }
-    .login-box input {
-      width: 100%;
-      font-size: 1rem;
-      padding: 9px 12px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      margin-bottom: 12px;
-    }
-    .login-box input:focus { outline: none; border-color: #3b5bdb; }
-    .login-box button {
-      width: 100%;
-      padding: 10px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      background: #3b5bdb;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    .login-box button:hover { background: #2f4ac7; }
-    .login-error {
-      color: #c92a2a;
-      font-size: 0.82rem;
-      margin-top: 8px;
-      display: none;
-    }
-
-    /* Status */
-    .status {
-      padding: 10px 14px;
-      border-radius: 6px;
-      margin-bottom: 16px;
-      font-size: 0.88rem;
-      display: none;
-    }
-    .status.error { background: #ffe3e3; color: #c92a2a; border: 1px solid #ffc9c9; display: block; }
-    .status.success { background: #d3f9d8; color: #2b8a3e; border: 1px solid #b2f2bb; display: block; }
-
-    /* Results */
-    .result-scroll { overflow-x: auto; }
-
-    .result-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.8rem;
-      min-width: 600px;
-    }
-
-    .result-table th, .result-table td {
-      border: 1px solid #e0e0e0;
-      padding: 8px 6px;
-      text-align: center;
-      vertical-align: top;
-    }
-
-    .result-table th { background: #f0f4ff; font-weight: 600; }
-    .result-table td.shift-label { background: #f8f9fa; font-weight: 600; font-size: 0.75rem; text-align: left; padding-left: 10px; white-space: nowrap; }
-    .result-table td.shift-label.yellow { background: #fffbe6; }
-
-    .chips { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
-    .chip {
-      background: #3b5bdb;
-      color: white;
-      border-radius: 4px;
-      padding: 2px 7px;
-      font-size: 0.72rem;
-    }
-    .empty-slot { color: #ccc; }
-
     /* Tabs */
-    .tabs {
-      display: flex;
-      gap: 6px;
-      border-bottom: 2px solid #e0e0e0;
-      margin-bottom: 22px;
-    }
+    .tabs { display: flex; gap: 6px; border-bottom: 2px solid #e0e0e0; margin-bottom: 22px; flex-wrap: wrap; }
     .tab {
       padding: 10px 18px;
       font-size: 0.92rem;
@@ -288,25 +52,91 @@
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
 
-    /* Unsaved-changes badge */
-    .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
-    .card-head h2 { margin-bottom: 0; }
-    .badge {
-      font-size: 0.72rem;
-      font-weight: 700;
-      padding: 3px 9px;
-      border-radius: 10px;
-      background: #fff3bf;
-      color: #9c6b00;
-      display: none;
+    /* Banner showing draft vs published state */
+    .banner {
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin-bottom: 18px;
+      font-size: 0.86rem;
+      line-height: 1.5;
     }
-    .badge.show { display: inline-block; }
-    .help-text { font-size: 0.8rem; color: #777; margin-top: 12px; }
+    .banner.draft { background: #fff3bf; color: #7a5300; border: 1px solid #ffe066; }
+    .banner.live { background: #d3f9d8; color: #2b8a3e; border: 1px solid #b2f2bb; }
+    .banner.none { background: #f1f3f5; color: #555; border: 1px solid #dee2e6; }
+    .banner a { color: inherit; }
+    .save-state { font-size: 0.78rem; color: #999; }
 
-    /* Create button with hover tooltip */
-    .create-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+    /* Period */
+    .period-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
+    .period-row input[type="date"] { width: 100%; font-size: 0.9rem; padding: 7px 10px; border: 1px solid #ccc; border-radius: 6px; }
+    .field-group label { display: block; font-size: 0.78rem; color: #666; margin-bottom: 4px; }
+    .week-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .week-pill { background: #f0f4ff; color: #3b5bdb; border-radius: 6px; padding: 4px 10px; font-size: 0.8rem; font-weight: 600; }
+    .period-error { font-size: 0.82rem; color: #c92a2a; margin-top: 8px; }
+
+    /* Shift capacity grid */
+    .shift-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+    .shift-cell { text-align: center; }
+    .shift-cell label { display: block; font-size: 0.7rem; color: #666; margin-bottom: 4px; line-height: 1.3; }
+    .shift-cell input { width: 100%; text-align: center; font-size: 0.9rem; padding: 6px 4px; border: 1px solid #ccc; border-radius: 6px; }
+    .shift-cell.yellow label { color: #b08300; }
+    .shift-cell.yellow input { background: #fffbe6; border-color: #ffe066; }
+    .shift-cell.locked label { color: #aaa; }
+    .shift-cell.locked label::after { content: " (auto)"; font-style: italic; font-size: 0.65rem; }
+    .shift-cell.locked input { background: #f4f4f4; color: #aaa; cursor: not-allowed; border-color: #ddd; }
+    .yellows-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; font-size: 0.88rem; }
+    .yellows-row input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+
+    /* Workers table */
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th { text-align: left; padding: 8px 10px; border-bottom: 2px solid #e8e8e8; font-weight: 600; font-size: 0.82rem; color: #555; }
+    td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; }
+    tr:last-child td { border-bottom: none; }
+    td.center { text-align: center; }
+
+    textarea { width: 100%; font-family: monospace; font-size: 0.82rem; padding: 10px; border: 1px solid #ccc; border-radius: 6px; resize: vertical; }
+
+    /* Submissions */
+    .pref-actions { display: flex; gap: 10px; }
+    .pref-list { margin-top: 12px; }
+    .pref-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f8f9fa; border-radius: 6px; margin-bottom: 6px; font-size: 0.85rem; flex-wrap: wrap; gap: 6px; }
+    .pref-item .initials { font-weight: 700; margin-right: 8px; }
+    .pref-item .count { color: #777; }
+    .pref-weeks { display: flex; flex-wrap: wrap; gap: 4px; }
+    .week-chip { font-size: 0.72rem; border-radius: 4px; padding: 2px 7px; background: #d3f9d8; color: #2b8a3e; white-space: nowrap; }
+    .week-chip.missing { background: #f1f3f5; color: #aaa; }
+    .pref-summary { font-size: 0.85rem; color: #555; margin-bottom: 8px; }
+    .pref-missing { font-size: 0.82rem; color: #b08300; background: #fffbe6; padding: 8px 12px; border-radius: 6px; margin-top: 8px; }
+
+    /* Buttons */
+    .btn { padding: 8px 16px; font-size: 0.88rem; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; white-space: nowrap; }
+    .btn-primary { background: #3b5bdb; color: white; }
+    .btn-primary:hover { background: #2f4ac7; }
+    .btn-ghost { background: #e9ecef; color: #444; }
+    .btn-ghost:hover { background: #dee2e6; }
+    .btn-danger { background: #fff0f0; color: #c92a2a; border: 1px solid #ffc9c9; }
+    .btn-danger:hover { background: #ffe3e3; }
+    .btn-danger.sm { padding: 4px 10px; font-size: 0.78rem; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-run {
+      width: 100%;
+      padding: 15px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      background: #2f9e44;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+    }
+    .btn-run:hover { background: #276236; }
+    .btn-run:disabled { background: #aaa; cursor: not-allowed; }
+
+    /* Big action button with hover tooltip */
+    .action-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
     .tooltip-wrap { position: relative; flex: 1; min-width: 260px; }
-    .tooltip-wrap .btn-run { margin-bottom: 0; }
     .tooltip {
       position: absolute;
       left: 50%;
@@ -322,70 +152,46 @@
       pointer-events: none;
       transition: opacity 0.15s, transform 0.15s;
     }
-    .tooltip::after {
-      content: "";
-      position: absolute;
-      left: 50%;
-      top: 100%;
-      transform: translateX(-50%);
-      border: 6px solid transparent;
-      border-top-color: #222;
-    }
-    .tooltip-wrap:hover .tooltip,
-    .tooltip-wrap:focus-within .tooltip { opacity: 1; transform: translateX(-50%) translateY(0); }
-    .posted-info { font-size: 0.85rem; color: #555; }
-    .posted-info a { color: #3b5bdb; }
+    .tooltip::after { content: ""; position: absolute; left: 50%; top: 100%; transform: translateX(-50%); border: 6px solid transparent; border-top-color: #222; }
+    .tooltip-wrap:hover .tooltip, .tooltip-wrap:focus-within .tooltip { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .action-info { font-size: 0.85rem; color: #555; }
+    .action-info a { color: #3b5bdb; }
 
-    /* Scheduling period */
-    .period-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr auto;
-      gap: 10px;
-      align-items: end;
-    }
-    .period-row input[type="date"] {
-      width: 100%;
-      font-size: 0.9rem;
-      padding: 7px 10px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-    }
-    .week-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-    .week-pill {
-      background: #f0f4ff;
-      color: #3b5bdb;
-      border-radius: 6px;
-      padding: 4px 10px;
-      font-size: 0.8rem;
-      font-weight: 600;
-    }
-    .period-status { font-size: 0.82rem; color: #555; margin-top: 8px; }
+    /* Login overlay */
+    .login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .login-box { background: white; border-radius: 10px; padding: 28px; width: 320px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+    .login-box h2 { margin-bottom: 16px; }
+    .login-box input { width: 100%; font-size: 1rem; padding: 9px 12px; border: 1px solid #ccc; border-radius: 6px; margin-bottom: 10px; }
+    .login-box button { width: 100%; padding: 10px; font-size: 0.95rem; font-weight: 600; background: #3b5bdb; color: white; border: none; border-radius: 6px; cursor: pointer; }
+    .login-box button:hover { background: #2f4ac7; }
+    .login-error { color: #c92a2a; font-size: 0.82rem; margin-top: 8px; display: none; }
 
-    /* Per-week submission chips */
-    .pref-item { flex-wrap: wrap; gap: 6px; }
-    .pref-weeks { display: flex; flex-wrap: wrap; gap: 4px; }
-    .week-chip {
-      font-size: 0.72rem;
-      border-radius: 4px;
-      padding: 2px 7px;
-      background: #d3f9d8;
-      color: #2b8a3e;
-      white-space: nowrap;
-    }
-    .week-chip.missing { background: #f1f3f5; color: #aaa; }
-    .pref-summary { font-size: 0.85rem; color: #555; margin-bottom: 8px; }
-    .pref-missing { font-size: 0.82rem; color: #b08300; background: #fffbe6; padding: 8px 12px; border-radius: 6px; margin-top: 8px; }
+    /* Status */
+    .status { padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 0.88rem; display: none; }
+    .status.error { background: #ffe3e3; color: #c92a2a; border: 1px solid #ffc9c9; display: block; }
+    .status.success { background: #d3f9d8; color: #2b8a3e; border: 1px solid #b2f2bb; display: block; }
 
-    /* Per-week results */
+    /* Schedule tables (preview and results) */
+    .results-note { font-size: 0.82rem; color: #777; margin-bottom: 12px; }
     .week-result { margin-bottom: 22px; }
     .week-result:last-child { margin-bottom: 0; }
     .week-result h3 { font-size: 0.95rem; margin-bottom: 8px; }
-    .week-result .week-error {
-      background: #ffe3e3; color: #c92a2a; border: 1px solid #ffc9c9;
-      padding: 8px 12px; border-radius: 6px; font-size: 0.82rem; margin-bottom: 8px;
-    }
+    .week-result .week-error { background: #ffe3e3; color: #c92a2a; border: 1px solid #ffc9c9; padding: 8px 12px; border-radius: 6px; font-size: 0.82rem; margin-bottom: 8px; }
     .week-result .week-error ul { margin-top: 4px; padding-left: 18px; }
-    .results-note { font-size: 0.82rem; color: #777; margin-bottom: 12px; }
+    .result-scroll { overflow-x: auto; }
+    .result-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 600px; }
+    .result-table th, .result-table td { border: 1px solid #e0e0e0; padding: 8px 6px; text-align: center; vertical-align: top; }
+    .result-table th { background: #f0f4ff; font-weight: 600; }
+    .result-table td.shift-label { background: #f8f9fa; font-weight: 600; font-size: 0.75rem; text-align: left; padding-left: 10px; white-space: nowrap; }
+    .result-table td.shift-label.yellow { background: #fffbe6; }
+    .chips { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+    .chip { background: #3b5bdb; color: white; border-radius: 4px; padding: 2px 7px; font-size: 0.72rem; }
+    .empty-slot { color: #ccc; }
+    /* Empty slots in the preview */
+    .slot { display: inline-block; width: 28px; height: 18px; border: 1.5px dashed #b8c4f0; border-radius: 4px; background: #f8f9ff; }
+    .slot.yellow { border-color: #ffd43b; background: #fffbe6; }
+    .legend { display: flex; gap: 16px; font-size: 0.8rem; color: #666; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+    .legend .slot { vertical-align: middle; margin-right: 4px; }
   </style>
 </head>
 <body>
@@ -404,14 +210,20 @@
 <div class="tabs">
   <button class="tab active" data-tab="create" onclick="showTab('create')">Create Schedule</button>
   <button class="tab" data-tab="preview" onclick="showTab('preview')">Preview Schedule</button>
+  <button class="tab" data-tab="run" onclick="showTab('run')">Run Schedule</button>
 </div>
 
+<div class="banner none" id="banner"></div>
+
+<!-- ═══════════════ CREATE SCHEDULE ═══════════════ -->
 <div class="tab-panel active" id="tab-create">
 
-<!-- SCHEDULING PERIOD -->
 <div class="card">
-  <h2>Scheduling Period</h2>
-  <div class="section-label">Workers can submit shift preferences for every week in this range.</div>
+  <div class="card-head">
+    <h2>Scheduling Period</h2>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="section-label">Every Monday-to-Sunday week in this range is included.</div>
   <div class="period-row">
     <div class="field-group">
       <label>Start (week of)</label>
@@ -421,43 +233,29 @@
       <label>End</label>
       <input type="date" id="period-end">
     </div>
-    <div>
-      <button class="btn btn-primary" onclick="savePeriod()">Save Period</button>
-    </div>
   </div>
-  <div class="week-list" id="week-list"><span class="empty-msg">No scheduling period set. Workers cannot submit yet.</span></div>
-  <div class="period-status" id="period-status"></div>
+  <div class="period-error" id="period-error"></div>
+  <div class="week-list" id="week-list"></div>
 </div>
 
-<!-- SCHEDULE SETTINGS -->
 <div class="card">
-  <div class="card-head">
-    <h2>Shift Sizes</h2>
-    <span class="badge" id="settings-badge">Unsaved — affects preview only</span>
-  </div>
-
+  <h2>Shift Sizes</h2>
   <div class="section-label">Number of people per shift. (Monday - Friday)</div>
   <div class="shift-grid" id="weekday-grid"></div>
-
   <hr class="divider">
-
   <div class="section-label">Number of people per shift. (Saturday - Sunday)</div>
   <div class="shift-grid" id="weekend-grid"></div>
-
   <div class="yellows-row">
     <input type="checkbox" id="yellows" checked>
     <label for="yellows">Yellows?</label>
   </div>
-  <div class="help-text">Changes here are not applied until you press <strong>Create Schedule</strong> on the Preview Schedule tab. Until then they only affect the preview.</div>
 </div>
 
-<!-- WORKERS -->
 <div class="card">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-    <h2 style="margin-bottom:0">Add Workers</h2>
-    <button class="btn btn-danger sm" id="clear-workers-btn" onclick="clearWorkers()">Clear All Workers</button>
+  <div class="card-head">
+    <h2>Workers</h2>
+    <button class="btn btn-danger sm" onclick="clearWorkers()">Clear All Workers</button>
   </div>
-
   <table>
     <thead>
       <tr>
@@ -471,9 +269,7 @@
       <tr id="workers-empty-row"><td colspan="4" class="empty-msg" style="padding:12px 10px">No workers added yet.</td></tr>
     </tbody>
   </table>
-
   <hr class="divider">
-
   <div class="section-label">Bulk import</div>
   <textarea id="bulk-input" rows="5" placeholder="Copy and paste from the Priority Points Rankings Spreadsheet (dont include commas)&#10;Example:&#10;HM        8516.38&#10;DH        5648.00&#10;AB        4265.71"></textarea>
   <div style="display:flex;gap:10px;align-items:center;margin-top:8px;">
@@ -482,62 +278,104 @@
   </div>
 </div>
 
+<div class="help-text">Nothing on this tab is visible to workers until you press <strong>Create Schedule</strong> on the Preview Schedule tab.</div>
+
 </div><!-- /tab-create -->
 
+<!-- ═══════════════ PREVIEW SCHEDULE ═══════════════ -->
 <div class="tab-panel" id="tab-preview">
 
-<!-- WORKER PREFERENCES -->
+<div class="card">
+  <h2>Schedule Preview</h2>
+  <div class="results-note">This is the empty schedule workers will fill in, built from the period and shift sizes on the Create Schedule tab.</div>
+  <div class="legend" id="preview-legend">
+    <span><span class="slot"></span> Required slot</span>
+    <span><span class="slot yellow"></span> Yellow (optional extra) slot</span>
+  </div>
+  <div id="preview-grid"></div>
+</div>
+
+<div class="action-row">
+  <div class="tooltip-wrap">
+    <button class="btn-run" id="create-btn" onclick="createSchedule()" title="This creates the schedule for everyone.">Create Schedule</button>
+    <span class="tooltip" role="tooltip">This creates the schedule for everyone.</span>
+  </div>
+  <div class="action-info" id="create-info"></div>
+</div>
+<div class="status" id="create-status"></div>
+
+</div><!-- /tab-preview -->
+
+<!-- ═══════════════ RUN SCHEDULE ═══════════════ -->
+<div class="tab-panel" id="tab-run">
+
 <div class="card">
   <h2>Submitted Shifts</h2>
   <div class="pref-actions">
     <button class="btn btn-primary" onclick="loadPreferences()">Refresh</button>
     <button class="btn btn-ghost" onclick="clearPreferences()">Clear All</button>
   </div>
-  <div class="pref-list" id="pref-list" style="margin-top:12px;">
-    <p class="empty-msg">Loading submitted preferences…</p>
-  </div>
+  <div class="pref-list" id="pref-list"><p class="empty-msg">Loading…</p></div>
 </div>
 
-<!-- PREVIEW -->
-<div class="card">
-  <div class="card-head">
-    <h2>Schedule Preview</h2>
-    <button class="btn btn-ghost" onclick="loadPreview()">Refresh Preview</button>
-  </div>
-  <div class="results-note">Preview only. Workers cannot see this. It uses the current shift sizes and the submissions above.</div>
-  <div class="status" id="preview-status"></div>
-  <div id="preview-grid"><p class="empty-msg">Generating preview…</p></div>
-</div>
-
-<!-- CREATE -->
-<div class="create-row">
+<div class="action-row">
   <div class="tooltip-wrap">
-    <button class="btn-run" id="create-btn" onclick="createSchedule()" title="This creates the schedule for everyone.">Create Schedule</button>
-    <span class="tooltip" role="tooltip">This creates the schedule for everyone.</span>
+    <button class="btn-run" id="run-btn" onclick="runSchedule()">Run Schedule</button>
+    <span class="tooltip" role="tooltip">Assigns shifts from the submissions. Only you see the result until you post it.</span>
   </div>
-  <div class="posted-info" id="posted-info"></div>
+</div>
+<div class="status" id="run-status"></div>
+
+<div class="card" id="results-card" style="display:none">
+  <div class="card-head">
+    <h2>Results</h2>
+    <div class="tooltip-wrap" style="flex:none;min-width:0">
+      <button class="btn btn-primary" id="post-btn" onclick="postResults()" title="This posts the schedule for everyone.">Post to Workers</button>
+      <span class="tooltip" role="tooltip">This posts the schedule for everyone.</span>
+    </div>
+  </div>
+  <div class="results-note" id="results-note"></div>
+  <div id="result-grid"></div>
 </div>
 
-<div class="status" id="status-msg"></div>
-
-</div><!-- /tab-preview -->
+</div><!-- /tab-run -->
 
 <script>
-  // ── Tabs ─────────────────────────────────────────────────────────────────
+  // ── Constants ─────────────────────────────────────────────────────────────
+
+  const SHIFT_LABELS = ["12am – 3am", "3am – 6am", "6am – 9am", "9am – 12pm", "12pm – 3pm", "3pm – 6pm", "6pm – 9pm", "9pm – 12am"];
+  const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const YELLOW_SHIFTS = [3, 4, 5];
+  const DEFAULT_WEEKDAYS = [1, 1, 2, 3, 3, 3, 2, 2];
+  const DEFAULT_WEEKENDS = [1, 1, 1, 2, 2, 2, 2, 2];
+
+  // ── State ─────────────────────────────────────────────────────────────────
+
+  let draft = { start: null, end: null, weeks: [], settings: null, workers: [] };  // being edited
+  let published = null;   // what workers currently see
+  let preferences = [];   // [{ initials, weeks: { isoMonday: [[day, shift], ...] } }]
+  let results = null;     // last run
+  let posted = null;      // results workers can see
+
+  // ── Date helpers ──────────────────────────────────────────────────────────
+
+  function parseISO(iso) { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); }
+  function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
+  function shortDate(date) { return date.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
+  function numericDate(date) { return `${date.getMonth() + 1}/${date.getDate()}`; }
+  function weekLabel(iso) { const s = parseISO(iso); return `${shortDate(s)} – ${shortDate(addDays(s, 6))}`; }
+  function fmtStamp(iso) { return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }); }
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
 
   function showTab(name) {
     document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === `tab-${name}`));
     try { sessionStorage.setItem("adminTab", name); } catch {}
-    if (name === "preview" && adminToken && weeks.length > 0) loadPreview();
+    if (name === "preview") renderPreview();
   }
 
-  try {
-    const savedTab = sessionStorage.getItem("adminTab");
-    if (savedTab === "preview") showTab("preview");
-  } catch {}
-
-  // ── Auth ─────────────────────────────────────────────────────────────────
+  // ── Auth ──────────────────────────────────────────────────────────────────
 
   let adminToken = sessionStorage.getItem("adminToken");
 
@@ -556,8 +394,7 @@
         body: JSON.stringify({ password })
       });
       if (!res.ok) { errorEl.style.display = "block"; return; }
-      const data = await res.json();
-      adminToken = data.token;
+      adminToken = (await res.json()).token;
       sessionStorage.setItem("adminToken", adminToken);
       document.getElementById("login-overlay").style.display = "none";
       loadAll();
@@ -574,96 +411,11 @@
     document.getElementById("password-input").value = "";
   }
 
-  // Hide overlay immediately if we have a stored token; validate it lazily on first request
   if (adminToken) document.getElementById("login-overlay").style.display = "none";
 
-  const SHIFT_LABELS = [
-    "12am – 3am",
-    "3am – 6am",
-    "6am – 9am",
-    "9am – 12pm",
-    "12pm – 3pm",
-    "3pm – 6pm",
-    "6pm – 9pm",
-    "9pm – 12am"
-  ];
-  const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const YELLOW_SHIFTS = [3, 4, 5];
+  // ── Draft: read from / write to the form ──────────────────────────────────
 
-  // Defaults — index 1 (3am-6am) mirrors index 0 automatically
-  const DEFAULT_WEEKDAYS = [1, 1, 2, 3, 3, 3, 2, 2];
-  const DEFAULT_WEEKENDS = [1, 1, 1, 2, 2, 2, 2, 2];
-
-  let workers = [];     // { initials, points, doubles }
-  let preferences = []; // { initials, weeks: { isoMonday: [[day, shift], ...] } }
-  let weeks = [];       // ISO date of each Monday in the scheduling period
-
-  // ── Date helpers ──────────────────────────────────────────────────────────
-
-  function parseISO(iso) {
-    const [y, m, d] = iso.split("-").map(Number);
-    return new Date(y, m - 1, d);
-  }
-  function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
-  function shortDate(date) { return date.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
-  function numericDate(date) { return `${date.getMonth() + 1}/${date.getDate()}`; }
-  function weekLabel(iso) { const s = parseISO(iso); return `${shortDate(s)} – ${shortDate(addDays(s, 6))}`; }
-  function toISO(date) {
-    const p = n => String(n).padStart(2, "0");
-    return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
-  }
-
-  // ── Scheduling period ─────────────────────────────────────────────────────
-
-  function renderWeeks() {
-    const list = document.getElementById("week-list");
-    if (weeks.length === 0) {
-      list.innerHTML = '<span class="empty-msg">No scheduling period set. Workers cannot submit yet.</span>';
-      return;
-    }
-    list.innerHTML = weeks.map(w => `<span class="week-pill">Week of ${weekLabel(w)}</span>`).join("");
-  }
-
-  async function loadWeeks() {
-    try {
-      const res = await fetch("/weeks");
-      if (!res.ok) throw new Error();
-      weeks = (await res.json()).weeks || [];
-    } catch { weeks = []; }
-    if (weeks.length > 0) {
-      document.getElementById("period-start").value = weeks[0];
-      document.getElementById("period-end").value = toISO(addDays(parseISO(weeks[weeks.length - 1]), 6));
-    }
-    renderWeeks();
-  }
-
-  async function savePeriod() {
-    const start = document.getElementById("period-start").value;
-    const end = document.getElementById("period-end").value;
-    const statusEl = document.getElementById("period-status");
-    if (!start || !end) { statusEl.textContent = "Pick both a start and an end date."; return; }
-    if (preferences.length > 0 && weeks.length > 0) {
-      if (!confirm("Changing the period will drop any submitted preferences for weeks that fall outside the new range. Continue?")) return;
-    }
-    try {
-      const res = await fetch("/weeks", { method: "PUT", headers: authHeaders(), body: JSON.stringify({ start, end }) });
-      if (res.status === 401) { handleUnauthorized(); return; }
-      const data = await res.json();
-      if (!res.ok) { statusEl.textContent = data?.detail || `Server error ${res.status}`; return; }
-      weeks = data.weeks;
-      renderWeeks();
-      statusEl.textContent = `Saved. ${weeks.length} week${weeks.length !== 1 ? "s" : ""} open for workers.`;
-      setTimeout(() => { statusEl.textContent = ""; }, 4000);
-      loadPreferences();
-      loadPosted();
-    } catch (err) {
-      statusEl.textContent = `Could not save: ${err.message}`;
-    }
-  }
-
-  // ── Build capacity grids ──────────────────────────────────────────────────
-
-  function buildGrid(containerId, defaults) {
+  function buildGrid(containerId, values) {
     const el = document.getElementById(containerId);
     el.innerHTML = "";
     SHIFT_LABELS.forEach((label, i) => {
@@ -672,14 +424,17 @@
       cell.className = "shift-cell" + (locked ? " locked" : "");
       cell.dataset.shift = i;
       cell.innerHTML = locked
-        ? `<label>${label}</label><input type="number" value="${defaults[i]}" id="${containerId}-${i}" disabled>`
-        : `<label>${label}</label><input type="number" min="0" max="20" value="${defaults[i]}" id="${containerId}-${i}">`;
+        ? `<label>${label}</label><input type="number" value="${values[i]}" id="${containerId}-${i}" disabled>`
+        : `<label>${label}</label><input type="number" min="0" max="20" value="${values[i]}" id="${containerId}-${i}">`;
       el.appendChild(cell);
+    });
+    document.getElementById(`${containerId}-0`).addEventListener("input", () => {
+      document.getElementById(`${containerId}-1`).value = document.getElementById(`${containerId}-0`).value;
     });
   }
 
-  function syncGraveCapacity(gridId) {
-    document.getElementById(`${gridId}-1`).value = document.getElementById(`${gridId}-0`).value;
+  function getCapacities(gridId) {
+    return SHIFT_LABELS.map((_, i) => parseInt(document.getElementById(`${gridId}-${i}`).value) || 0);
   }
 
   function updateYellowHighlight() {
@@ -689,127 +444,112 @@
     });
   }
 
-  buildGrid("weekday-grid", DEFAULT_WEEKDAYS);
-  buildGrid("weekend-grid", DEFAULT_WEEKENDS);
-  updateYellowHighlight();
-
-  document.getElementById("weekday-grid-0").addEventListener("input", () => syncGraveCapacity("weekday-grid"));
-  document.getElementById("weekend-grid-0").addEventListener("input", () => syncGraveCapacity("weekend-grid"));
-  document.getElementById("yellows").addEventListener("change", updateYellowHighlight);
-
-  function getCapacities(gridId) {
-    return SHIFT_LABELS.map((_, i) => parseInt(document.getElementById(`${gridId}-${i}`).value) || 0);
-  }
-
-  function currentSettings() {
+  function formToDraft() {
     return {
-      weekdays: getCapacities("weekday-grid"),
-      weekends: getCapacities("weekend-grid"),
-      yellows: document.getElementById("yellows").checked
+      start: document.getElementById("period-start").value || null,
+      end: document.getElementById("period-end").value || null,
+      settings: {
+        weekdays: getCapacities("weekday-grid"),
+        weekends: getCapacities("weekend-grid"),
+        yellows: document.getElementById("yellows").checked
+      },
+      workers: draft.workers
     };
   }
 
-  // Shift sizes are NOT saved automatically. They are sent with each preview and
-  // only persisted when Create Schedule is pressed.
-  let savedSettings = currentSettings();
-
-  function updateSettingsBadge() {
-    const dirty = JSON.stringify(currentSettings()) !== JSON.stringify(savedSettings);
-    document.getElementById("settings-badge").classList.toggle("show", dirty);
+  function draftToForm() {
+    document.getElementById("period-start").value = draft.start || "";
+    document.getElementById("period-end").value = draft.end || "";
+    const s = draft.settings || { weekdays: DEFAULT_WEEKDAYS, weekends: DEFAULT_WEEKENDS, yellows: true };
+    buildGrid("weekday-grid", s.weekdays);
+    buildGrid("weekend-grid", s.weekends);
+    document.getElementById("yellows").checked = !!s.yellows;
+    updateYellowHighlight();
+    renderWeeks();
+    renderWorkers();
   }
 
-  async function loadSettings() {
+  function renderWeeks() {
+    const list = document.getElementById("week-list");
+    if (!draft.weeks || draft.weeks.length === 0) {
+      list.innerHTML = '<span class="empty-msg">Pick a start and end date.</span>';
+      return;
+    }
+    list.innerHTML = draft.weeks.map(w => `<span class="week-pill">Week of ${weekLabel(w)}</span>`).join("");
+  }
+
+  // Save the draft to the server shortly after any edit, so nothing is lost on reload.
+  // This never affects what workers see.
+  let saveTimer = null;
+  function scheduleDraftSave() {
+    document.getElementById("save-state").textContent = "Saving draft…";
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveDraft, 400);
+  }
+
+  async function saveDraft() {
+    const body = formToDraft();
+    const errEl = document.getElementById("period-error");
     try {
-      const res = await fetch("/settings");
-      if (!res.ok) return;
-      const s = await res.json();
-      buildGrid("weekday-grid", s.weekdays || DEFAULT_WEEKDAYS);
-      buildGrid("weekend-grid", s.weekends || DEFAULT_WEEKENDS);
-      document.getElementById("yellows").checked = !!s.yellows;
-      updateYellowHighlight();
-      document.getElementById("weekday-grid-0").addEventListener("input", () => syncGraveCapacity("weekday-grid"));
-      document.getElementById("weekend-grid-0").addEventListener("input", () => syncGraveCapacity("weekend-grid"));
-    } catch { /* keep defaults */ }
-    savedSettings = currentSettings();
-    updateSettingsBadge();
+      const res = await fetch("/draft", { method: "PUT", headers: authHeaders(), body: JSON.stringify(body) });
+      if (res.status === 401) { handleUnauthorized(); return; }
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data?.detail || `Server error ${res.status}`;
+        document.getElementById("save-state").textContent = "Not saved";
+        return;
+      }
+      errEl.textContent = "";
+      draft = data;
+      renderWeeks();
+      document.getElementById("save-state").textContent = "Draft saved";
+      updateBanner();
+    } catch (err) {
+      document.getElementById("save-state").textContent = `Could not save: ${err.message}`;
+    }
   }
 
-  document.getElementById("weekday-grid").addEventListener("input", updateSettingsBadge);
-  document.getElementById("weekend-grid").addEventListener("input", updateSettingsBadge);
-  document.getElementById("yellows").addEventListener("change", updateSettingsBadge);
+  document.getElementById("period-start").addEventListener("change", scheduleDraftSave);
+  document.getElementById("period-end").addEventListener("change", scheduleDraftSave);
+  document.getElementById("weekday-grid").addEventListener("input", scheduleDraftSave);
+  document.getElementById("weekend-grid").addEventListener("input", scheduleDraftSave);
+  document.getElementById("yellows").addEventListener("change", () => { updateYellowHighlight(); scheduleDraftSave(); });
 
-  async function loadWorkers() {
-    try {
-      const res = await fetch("/workers");
-      if (!res.ok) return;
-      workers = await res.json();
-      renderWorkers();
-    } catch { /* keep empty */ }
-  }
-
-  // ── Workers ───────────────────────────────────────────────────────────────
+  // ── Workers (part of the draft) ───────────────────────────────────────────
 
   function renderWorkers() {
     const tbody = document.getElementById("workers-tbody");
     const emptyRow = document.getElementById("workers-empty-row");
-
-    // Remove all rows except the empty placeholder
     Array.from(tbody.querySelectorAll("tr.worker-row")).forEach(r => r.remove());
-
-    if (workers.length === 0) {
-      emptyRow.style.display = "";
-      return;
-    }
+    if (draft.workers.length === 0) { emptyRow.style.display = ""; return; }
     emptyRow.style.display = "none";
-
-    workers.forEach((w, i) => {
+    draft.workers.forEach((w, i) => {
       const tr = document.createElement("tr");
       tr.className = "worker-row";
       tr.innerHTML = `
         <td><strong>${w.initials}</strong></td>
         <td>${w.points.toLocaleString()}</td>
         <td class="center"><input type="checkbox" ${w.doubles ? "checked" : ""} onchange="toggleDoubles(${i}, this.checked)" style="width:16px;height:16px;cursor:pointer;"></td>
-        <td><button class="btn btn-danger sm" onclick="removeWorker(${i})">Remove</button></td>
-      `;
+        <td><button class="btn btn-danger sm" onclick="removeWorker(${i})">Remove</button></td>`;
       tbody.appendChild(tr);
     });
   }
 
+  function removeWorker(index) { draft.workers.splice(index, 1); renderWorkers(); scheduleDraftSave(); }
+  function toggleDoubles(index, value) { draft.workers[index].doubles = value; scheduleDraftSave(); }
+
   function clearWorkers() {
-    if (workers.length === 0) return;
-    if (!confirm(`Remove all ${workers.length} workers? Their submitted shifts will be kept, but they will no longer appear in the shift picker.`)) return;
-    workers = [];
+    if (draft.workers.length === 0) return;
+    if (!confirm(`Remove all ${draft.workers.length} workers from the draft?`)) return;
+    draft.workers = [];
     renderWorkers();
-    renderPreferences();
-    syncWorkers();
-  }
-
-  function removeWorker(index) {
-    workers.splice(index, 1);
-    renderWorkers();
-    syncWorkers();
-  }
-
-  function toggleDoubles(index, value) {
-    workers[index].doubles = value;
-    syncWorkers();
-  }
-
-  async function syncWorkers() {
-    try {
-      await fetch("/workers", {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify(workers)
-      });
-    } catch { /* non-critical, ignore */ }
+    scheduleDraftSave();
   }
 
   function bulkAddWorkers() {
     const raw = document.getElementById("bulk-input").value.trim();
     const statusEl = document.getElementById("bulk-status");
     if (!raw) { statusEl.textContent = "Paste some data first."; return; }
-
     let added = 0, skipped = 0;
     raw.split("\n").forEach(line => {
       const parts = line.trim().split(/\s+/);
@@ -817,35 +557,124 @@
       const initials = parts[0].toUpperCase();
       const points = parseFloat(parts[1]);
       if (!initials || isNaN(points)) return;
-      if (workers.find(w => w.initials === initials)) { skipped++; return; }
-      workers.push({ initials, points, doubles: false });
+      if (draft.workers.find(w => w.initials === initials)) { skipped++; return; }
+      draft.workers.push({ initials, points, doubles: false });
       added++;
     });
-
     renderWorkers();
-    syncWorkers();
+    scheduleDraftSave();
     document.getElementById("bulk-input").value = "";
     statusEl.textContent = `Added ${added}${skipped ? `, skipped ${skipped} duplicate${skipped > 1 ? "s" : ""}` : ""}.`;
     setTimeout(() => { statusEl.textContent = ""; }, 3000);
   }
 
-  // ── Preferences ───────────────────────────────────────────────────────────
+  // ── Banner: draft vs published ────────────────────────────────────────────
+
+  function setupsDiffer(a, b) {
+    if (!a || !b) return true;
+    const strip = x => JSON.stringify({ weeks: x.weeks, settings: x.settings, workers: x.workers });
+    return strip(a) !== strip(b);
+  }
+
+  function updateBanner() {
+    const el = document.getElementById("banner");
+    if (!published) {
+      el.className = "banner none";
+      el.innerHTML = `No schedule has been created yet. Workers see nothing until you press Create Schedule on the Preview Schedule tab.`;
+    } else if (setupsDiffer(draft, published)) {
+      el.className = "banner draft";
+      el.innerHTML = `You have unpublished changes. Workers still see the schedule created <strong>${fmtStamp(published.created_at)}</strong>. Press Create Schedule on the Preview Schedule tab to apply them.`;
+    } else {
+      el.className = "banner live";
+      el.innerHTML = `Schedule is live. Created <strong>${fmtStamp(published.created_at)}</strong>, ${published.weeks.length} week${published.weeks.length !== 1 ? "s" : ""}, ${published.workers.length} workers.`;
+    }
+    const info = document.getElementById("create-info");
+    info.innerHTML = published
+      ? `Workers currently see the schedule created <strong>${fmtStamp(published.created_at)}</strong>.` + (setupsDiffer(draft, published) ? " The preview above differs from it." : " The preview above matches it.")
+      : "Workers cannot see anything until you create the schedule.";
+  }
+
+  // ── Preview: the empty schedule ───────────────────────────────────────────
+
+  function renderPreview() {
+    const grid = document.getElementById("preview-grid");
+    const s = draft.settings;
+    if (!draft.weeks || draft.weeks.length === 0 || !s) {
+      grid.innerHTML = '<p class="empty-msg">Pick a start and end date on the Create Schedule tab to see the preview.</p>';
+      return;
+    }
+    document.getElementById("preview-legend").style.display = s.yellows ? "flex" : "none";
+
+    grid.innerHTML = draft.weeks.map(week => {
+      const monday = parseISO(week);
+      let html = `<div class="week-result"><h3>Week of ${weekLabel(week)}</h3><div class="result-scroll"><table class="result-table">
+        <thead><tr><th>Shift</th>${DAY_LABELS.map((d, i) => `<th>${d} ${numericDate(addDays(monday, i))}</th>`).join("")}</tr></thead><tbody>`;
+      SHIFT_LABELS.forEach((label, si) => {
+        const isYellowShift = s.yellows && YELLOW_SHIFTS.includes(si);
+        html += `<tr><td class="shift-label${isYellowShift ? " yellow" : ""}">${label}</td>`;
+        DAY_LABELS.forEach((_, di) => {
+          const cap = di <= 4 ? s.weekdays[si] : s.weekends[si];
+          const yellowHere = isYellowShift && di <= 4 && cap > 0;
+          if (cap <= 0) { html += `<td><span class="empty-slot">—</span></td>`; return; }
+          const slots = [];
+          for (let k = 0; k < cap; k++) slots.push(`<span class="slot${yellowHere && k === cap - 1 ? " yellow" : ""}"></span>`);
+          html += `<td><div class="chips">${slots.join("")}</div></td>`;
+        });
+        html += "</tr>";
+      });
+      return html + "</tbody></table></div></div>";
+    }).join("");
+  }
+
+  async function createSchedule() {
+    const btn = document.getElementById("create-btn");
+    const statusEl = document.getElementById("create-status");
+    statusEl.className = "status";
+    if (!draft.weeks || draft.weeks.length === 0) { showStatus("Pick a start and end date first.", "error", statusEl); return; }
+    if (draft.workers.length === 0) { showStatus("Add workers first.", "error", statusEl); return; }
+
+    let msg = `Create the schedule for everyone?\n\nWorkers will see ${draft.weeks.length} week${draft.weeks.length !== 1 ? "s" : ""} and can start picking shifts.`;
+    if (published) {
+      const dropped = published.weeks.filter(w => !draft.weeks.includes(w));
+      if (dropped.length > 0) msg += `\n\n${dropped.length} week${dropped.length !== 1 ? "s" : ""} will be removed. Any shifts workers submitted for those weeks will be deleted.`;
+    }
+    if (!confirm(msg)) return;
+
+    btn.disabled = true;
+    btn.textContent = "Creating…";
+    try {
+      await saveDraft();
+      const res = await fetch("/publish", { method: "POST", headers: authHeaders() });
+      if (res.status === 401) { handleUnauthorized(); return; }
+      const data = await res.json();
+      if (!res.ok) { showStatus(data?.detail || `Server error ${res.status}`, "error", statusEl); return; }
+      published = data;
+      updateBanner();
+      showStatus("Schedule created. Workers can now pick their shifts.", "success", statusEl);
+      loadPreferences();
+    } catch (err) {
+      showStatus(`Request failed: ${err.message}.`, "error", statusEl);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Create Schedule";
+    }
+  }
+
+  // ── Submissions ───────────────────────────────────────────────────────────
 
   function renderPreferences() {
     const list = document.getElementById("pref-list");
-    if (preferences.length === 0) {
-      list.innerHTML = '<p class="empty-msg">No preferences submitted yet.</p>';
+    if (!published) {
+      list.innerHTML = '<p class="empty-msg">Create the schedule first. Workers cannot submit until then.</p>';
       return;
     }
-
+    const weeks = published.weeks;
+    const workers = published.workers.map(w => w.initials);
     const submittedSet = new Set(preferences.map(p => p.initials));
-    const notSubmitted = workers.map(w => w.initials).filter(i => !submittedSet.has(i));
-    const summary = workers.length > 0
-      ? `<div class="pref-summary"><strong>${submittedSet.size}</strong> of <strong>${workers.length}</strong> workers have submitted.</div>`
-      : "";
+    const notSubmitted = workers.filter(i => !submittedSet.has(i));
 
-    const sorted = [...preferences].sort((a, b) => a.initials.localeCompare(b.initials));
-    const items = sorted.map(p => {
+    const summary = `<div class="pref-summary"><strong>${submittedSet.size}</strong> of <strong>${workers.length}</strong> workers have submitted.</div>`;
+    const items = [...preferences].sort((a, b) => a.initials.localeCompare(b.initials)).map(p => {
       const chips = weeks.map(w => {
         const n = (p.weeks[w] || []).length;
         const label = shortDate(parseISO(w));
@@ -854,19 +683,14 @@
           : `<span class="week-chip missing" title="Week of ${weekLabel(w)}">${label}: —</span>`;
       }).join("");
       const done = weeks.filter(w => (p.weeks[w] || []).length > 0).length;
-      return `
-      <div class="pref-item">
+      return `<div class="pref-item">
         <span><span class="initials">${p.initials}</span><span class="count">${done}/${weeks.length} weeks</span></span>
         <span class="pref-weeks">${chips}</span>
         <button class="btn btn-danger sm" onclick="removePref('${p.initials}')">Remove</button>
       </div>`;
     }).join("");
-
-    const missing = notSubmitted.length > 0
-      ? `<div class="pref-missing">Not yet submitted: ${notSubmitted.join(", ")}</div>`
-      : "";
-
-    list.innerHTML = summary + items + missing;
+    const missing = notSubmitted.length > 0 ? `<div class="pref-missing">Not yet submitted: ${notSubmitted.join(", ")}</div>` : "";
+    list.innerHTML = summary + (items || '<p class="empty-msg">No submissions yet.</p>') + missing;
   }
 
   async function loadPreferences() {
@@ -878,7 +702,7 @@
       preferences = data.map(p => ({ initials: p.initials, weeks: p.weeks || {} }));
       renderPreferences();
     } catch (err) {
-      alert(`Could not load preferences: ${err.message}`);
+      document.getElementById("pref-list").innerHTML = `<p class="empty-msg">Could not load submissions: ${err.message}</p>`;
     }
   }
 
@@ -886,185 +710,145 @@
     try {
       const res = await fetch(`/preferences/${initials}`, { method: "DELETE", headers: authHeaders() });
       if (res.status === 401) { handleUnauthorized(); return; }
-    } catch { /* ignore network errors */ }
+    } catch { /* ignore */ }
     preferences = preferences.filter(p => p.initials !== initials);
     renderPreferences();
   }
 
   async function clearPreferences() {
     if (preferences.length === 0) return;
-    if (!confirm("Clear all submitted preferences?")) return;
+    if (!confirm("Clear all submitted shifts?")) return;
     try {
       const res = await fetch("/preferences", { method: "DELETE", headers: authHeaders() });
       if (res.status === 401) { handleUnauthorized(); return; }
-    } catch { /* ignore network errors */ }
+    } catch { /* ignore */ }
     preferences = [];
     renderPreferences();
   }
 
-  // ── Run Schedule ──────────────────────────────────────────────────────────
+  // ── Run + post results ────────────────────────────────────────────────────
 
-  // ── Preview / Create ──────────────────────────────────────────────────────
-
-  let previewData = null;   // last preview result, used to warn before creating
-
-  function previewGuard() {
-    if (weeks.length === 0) return "Set the scheduling period on the Create Schedule tab first.";
-    if (workers.length === 0) return "Add workers on the Create Schedule tab first.";
-    if (preferences.length === 0) return "No workers have submitted preferences yet.";
-    return null;
-  }
-
-  async function loadPreview() {
-    const grid = document.getElementById("preview-grid");
-    const statusEl = document.getElementById("preview-status");
+  async function runSchedule() {
+    const btn = document.getElementById("run-btn");
+    const statusEl = document.getElementById("run-status");
     statusEl.className = "status";
-    previewData = null;
-
-    const problem = previewGuard();
-    if (problem) {
-      grid.innerHTML = `<p class="empty-msg">${problem}</p>`;
-      return;
-    }
-
-    grid.innerHTML = '<p class="empty-msg">Generating preview…</p>';
-    try {
-      const res = await fetch("/preview_schedule", {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify(currentSettings())
-      });
-      if (res.status === 401) { handleUnauthorized(); return; }
-      const data = await res.json();
-      if (!res.ok) {
-        grid.innerHTML = "";
-        showStatus(`Server error ${res.status}: ${JSON.stringify(data?.detail ?? data)}`, "error", [], statusEl);
-        return;
-      }
-      previewData = data.weeks;
-      renderResults(grid, data.weeks, currentSettings().yellows);
-      const failed = data.weeks.filter(w => w.error);
-      if (failed.length > 0) {
-        showStatus(`${failed.length} of ${data.weeks.length} weeks cannot be fully filled with the current shift sizes and submissions. Details are listed under each week.`, "error", [], statusEl);
-      }
-    } catch (err) {
-      grid.innerHTML = "";
-      showStatus(`Request failed: ${err.message}.`, "error", [], statusEl);
-    }
-  }
-
-  async function createSchedule() {
-    const btn = document.getElementById("create-btn");
-    const problem = previewGuard();
-    if (problem) { showStatus(problem, "error"); return; }
-
-    if (!previewData) await loadPreview();
-    if (!previewData) return;
-
-    const failed = previewData.filter(w => w.error).length;
-    let msg = "Create the schedule for everyone? Workers will be able to see it immediately.";
-    if (failed > 0) msg = `${failed} of ${previewData.length} weeks have unfilled shifts.\n\n` + msg;
-    if (!confirm(msg)) return;
+    if (!published) { showStatus("Create the schedule before running it.", "error", statusEl); return; }
+    if (preferences.length === 0) { showStatus("No workers have submitted shifts yet.", "error", statusEl); return; }
 
     btn.disabled = true;
-    btn.textContent = "Creating…";
-    document.getElementById("status-msg").className = "status";
-
+    btn.textContent = "Running…";
     try {
-      const res = await fetch("/create_schedule", {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify(currentSettings())
-      });
+      const res = await fetch("/run_schedule", { method: "POST", headers: authHeaders() });
       if (res.status === 401) { handleUnauthorized(); return; }
       const data = await res.json();
-      if (!res.ok) {
-        showStatus(`Server error ${res.status}: ${JSON.stringify(data?.detail ?? data)}`, "error");
-        return;
-      }
-      savedSettings = currentSettings();
-      updateSettingsBadge();
-      renderPostedInfo(data);
-      showStatus("Schedule created. Workers can now see it on the shift picker page.", "success");
+      if (!res.ok) { showStatus(data?.detail || `Server error ${res.status}`, "error", statusEl); return; }
+      results = data;
+      renderResults();
+      const failed = data.weeks.filter(w => w.error).length;
+      if (failed > 0) showStatus(`${failed} of ${data.weeks.length} weeks could not be fully filled. Details are listed under each week.`, "error", statusEl);
+      else showStatus(`All ${data.weeks.length} weeks filled. Review below, then post to workers.`, "success", statusEl);
+      document.getElementById("results-card").scrollIntoView({ behavior: "smooth" });
     } catch (err) {
-      showStatus(`Request failed: ${err.message}.`, "error");
+      showStatus(`Request failed: ${err.message}.`, "error", statusEl);
     } finally {
       btn.disabled = false;
-      btn.textContent = "Create Schedule";
+      btn.textContent = "Run Schedule";
     }
   }
 
-  function renderPostedInfo(published) {
-    const el = document.getElementById("posted-info");
-    if (!published || !published.created_at) {
-      el.innerHTML = "No schedule has been posted yet. Workers see nothing until you create one.";
-      return;
-    }
-    const when = new Date(published.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-    el.innerHTML = `Posted schedule created <strong>${when}</strong>. <a href="/index.html?view=schedule" target="_blank">View as workers see it</a>`;
-  }
-
-  async function loadPosted() {
+  async function postResults() {
+    if (!results) return;
+    const failed = results.weeks.filter(w => w.error).length;
+    let msg = "Post this schedule for everyone? Workers will see it immediately.";
+    if (failed > 0) msg = `${failed} of ${results.weeks.length} weeks have unfilled shifts.\n\n` + msg;
+    if (!confirm(msg)) return;
+    const btn = document.getElementById("post-btn");
+    btn.disabled = true;
     try {
-      const res = await fetch("/schedule");
-      if (!res.ok) return;
-      renderPostedInfo(await res.json());
-    } catch { /* ignore */ }
-  }
-
-  function showStatus(msg, type, items = [], el = document.getElementById("status-msg")) {
-    el.className = `status ${type}`;
-    if (items.length > 0) {
-      el.innerHTML = `${msg}<ul style="margin-top:6px;padding-left:18px;">${items.map(s => `<li>${s}</li>`).join("")}</ul>`;
-    } else {
-      el.textContent = msg;
+      const res = await fetch("/post_results", { method: "POST", headers: authHeaders() });
+      if (res.status === 401) { handleUnauthorized(); return; }
+      const data = await res.json();
+      if (!res.ok) { showStatus(data?.detail || `Server error ${res.status}`, "error", document.getElementById("run-status")); return; }
+      posted = data;
+      renderResults();
+      showStatus("Posted. Workers can now see the schedule on the shift picker page.", "success", document.getElementById("run-status"));
+    } catch (err) {
+      showStatus(`Request failed: ${err.message}.`, "error", document.getElementById("run-status"));
+    } finally {
+      btn.disabled = false;
     }
   }
 
-  // ── Render Results ────────────────────────────────────────────────────────
+  function renderResults() {
+    const card = document.getElementById("results-card");
+    if (!results || !results.run_at) { card.style.display = "none"; return; }
+    card.style.display = "block";
 
-  function renderResults(grid, weekResults, yellows) {
-    grid.innerHTML = weekResults.map(w => {
+    let note = `Run ${fmtStamp(results.run_at)}. `;
+    if (posted && posted.posted_at && posted.run_at === results.run_at) {
+      note += `Posted to workers ${fmtStamp(posted.posted_at)}. <a href="/index.html?view=schedule" target="_blank">View as workers see it</a>`;
+    } else if (posted && posted.posted_at) {
+      note += `Not posted yet. Workers still see the schedule posted ${fmtStamp(posted.posted_at)}.`;
+    } else {
+      note += "Not posted yet. Only you can see this.";
+    }
+    document.getElementById("results-note").innerHTML = note;
+
+    document.getElementById("result-grid").innerHTML = results.weeks.map(w => {
       const monday = parseISO(w.week);
-      const schedule = w.schedule;
-
       let html = `<div class="week-result"><h3>Week of ${weekLabel(w.week)}</h3>`;
-      if (w.error) {
-        html += `<div class="week-error">Could not fill all required slots:<ul>${w.unfilled.map(u => `<li>${u}</li>`).join("")}</ul></div>`;
-      }
-
+      if (w.error) html += `<div class="week-error">Could not fill all required slots:<ul>${w.unfilled.map(u => `<li>${u}</li>`).join("")}</ul></div>`;
       html += `<div class="result-scroll"><table class="result-table">
-        <thead><tr><th>Shift</th>${DAY_LABELS.map((d, i) => `<th>${d} ${numericDate(addDays(monday, i))}</th>`).join("")}</tr></thead>
-        <tbody>`;
-
-      SHIFT_LABELS.forEach((shiftLabel, si) => {
-        const isYellow = yellows && YELLOW_SHIFTS.includes(si);
-        html += `<tr><td class="shift-label${isYellow ? " yellow" : ""}">${shiftLabel}</td>`;
+        <thead><tr><th>Shift</th>${DAY_LABELS.map((d, i) => `<th>${d} ${numericDate(addDays(monday, i))}</th>`).join("")}</tr></thead><tbody>`;
+      SHIFT_LABELS.forEach((label, si) => {
+        const isYellow = results.yellows && YELLOW_SHIFTS.includes(si);
+        html += `<tr><td class="shift-label${isYellow ? " yellow" : ""}">${label}</td>`;
         DAY_LABELS.forEach((_, di) => {
-          const assigned = schedule[di]?.[si] ?? [];
-          if (assigned.length > 0) {
-            html += `<td><div class="chips">${assigned.map(n => `<span class="chip">${n}</span>`).join("")}</div></td>`;
-          } else {
-            html += `<td><span class="empty-slot">—</span></td>`;
-          }
+          const assigned = w.schedule[di]?.[si] ?? [];
+          html += assigned.length > 0
+            ? `<td><div class="chips">${assigned.map(n => `<span class="chip">${n}</span>`).join("")}</div></td>`
+            : `<td><span class="empty-slot">—</span></td>`;
         });
         html += "</tr>";
       });
-
-      html += "</tbody></table></div></div>";
-      return html;
+      return html + "</tbody></table></div></div>";
     }).join("");
   }
 
-  // Init — everything lives on the server so the panel survives reloads and restarts
-  async function loadAll() {
-    await Promise.all([loadWeeks(), loadSettings(), loadWorkers(), loadPosted()]);
-    if (!adminToken) return;
-    await loadPreferences();
-    if (document.getElementById("tab-preview").classList.contains("active")) loadPreview();
+  function showStatus(msg, type, el) {
+    el.className = `status ${type}`;
+    el.textContent = msg;
   }
 
-  renderWorkers();
+  // ── Init ──────────────────────────────────────────────────────────────────
+
+  async function fetchJSON(url, auth) {
+    const res = await fetch(url, auth ? { headers: authHeaders() } : undefined);
+    if (res.status === 401) { handleUnauthorized(); return null; }
+    if (!res.ok) return null;
+    return res.json();
+  }
+
+  async function loadAll() {
+    if (!adminToken) return;
+    const [d, pub, res, post] = await Promise.all([
+      fetchJSON("/draft", true), fetchJSON("/published"), fetchJSON("/results", true), fetchJSON("/schedule")
+    ]);
+    if (d) draft = d;
+    published = pub && pub.created_at ? pub : null;
+    results = res && res.run_at ? res : null;
+    posted = post && post.posted_at ? post : null;
+    draftToForm();
+    updateBanner();
+    renderResults();
+    await loadPreferences();
+    try {
+      const savedTab = sessionStorage.getItem("adminTab");
+      if (savedTab && savedTab !== "create") showTab(savedTab);
+    } catch {}
+  }
+
+  draftToForm();
   loadAll();
 </script>
 </body>
