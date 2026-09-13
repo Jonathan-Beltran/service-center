@@ -371,4 +371,14 @@ def get_schedule():
     return store["posted_results"] or {"posted_at": None, "yellows": False, "weeks": []}
 
 
+# The pages are plain files that change on every deploy. Tell browsers to
+# re-check them on each load so nobody runs a stale copy against a new API.
+@app.middleware("http")
+async def no_cache_static(request, call_next):
+    response = await call_next(request)
+    if not request.url.path.startswith(("/admin/", "/draft", "/publish", "/published", "/preferences",
+                                        "/submit_preference", "/run_schedule", "/results", "/post_results", "/schedule")):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="static")
