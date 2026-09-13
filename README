@@ -15,12 +15,16 @@ How scheduling works
      Every Monday-to-Sunday week in that range is opened for workers.
   2. Workers open index.html, pick their initials, and rank shifts for each week
      using the week tabs. Coming back later reloads what they already submitted.
-  3. Days later, the supervisor opens admin.html, checks who has submitted, and
-     clicks "Run Schedule for All Weeks". One schedule is produced per week and
-     saved, so it is still there on the next visit.
+  3. Days later, the supervisor opens the Preview Schedule tab in admin.html,
+     checks who has submitted, and reviews the preview. The preview is a dry run
+     that nobody else can see. Shift size changes on the Create Schedule tab
+     only affect the preview until the schedule is created.
+  4. Clicking "Create Schedule" saves the shift sizes and posts the schedule.
+     Workers then see it under "Posted Schedule" on index.html, with their own
+     shifts highlighted. Creating again replaces the posted schedule.
 
 Persistence
-  All state (workers, shift sizes, period, submissions, results) is saved to a
+  All state (workers, shift sizes, period, submissions, posted schedule) is saved to a
   JSON file. Default: backend/store.json. Override with DATA_FILE.
   On Railway, attach a volume and set DATA_FILE=/data/store.json so submissions
   survive redeploys and restarts.

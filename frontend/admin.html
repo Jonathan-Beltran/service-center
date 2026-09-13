@@ -288,6 +288,54 @@
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
 
+    /* Unsaved-changes badge */
+    .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .card-head h2 { margin-bottom: 0; }
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 10px;
+      background: #fff3bf;
+      color: #9c6b00;
+      display: none;
+    }
+    .badge.show { display: inline-block; }
+    .help-text { font-size: 0.8rem; color: #777; margin-top: 12px; }
+
+    /* Create button with hover tooltip */
+    .create-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+    .tooltip-wrap { position: relative; flex: 1; min-width: 260px; }
+    .tooltip-wrap .btn-run { margin-bottom: 0; }
+    .tooltip {
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 10px);
+      transform: translateX(-50%) translateY(4px);
+      background: #222;
+      color: white;
+      font-size: 0.82rem;
+      padding: 7px 12px;
+      border-radius: 6px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s, transform 0.15s;
+    }
+    .tooltip::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 100%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: #222;
+    }
+    .tooltip-wrap:hover .tooltip,
+    .tooltip-wrap:focus-within .tooltip { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .posted-info { font-size: 0.85rem; color: #555; }
+    .posted-info a { color: #3b5bdb; }
+
     /* Scheduling period */
     .period-row {
       display: grid;
@@ -383,7 +431,10 @@
 
 <!-- SCHEDULE SETTINGS -->
 <div class="card">
-  <h2>Shift Sizes</h2>
+  <div class="card-head">
+    <h2>Shift Sizes</h2>
+    <span class="badge" id="settings-badge">Unsaved — affects preview only</span>
+  </div>
 
   <div class="section-label">Number of people per shift. (Monday - Friday)</div>
   <div class="shift-grid" id="weekday-grid"></div>
@@ -397,6 +448,7 @@
     <input type="checkbox" id="yellows" checked>
     <label for="yellows">Yellows?</label>
   </div>
+  <div class="help-text">Changes here are not applied until you press <strong>Create Schedule</strong> on the Preview Schedule tab. Until then they only affect the preview.</div>
 </div>
 
 <!-- WORKERS -->
@@ -446,17 +498,27 @@
   </div>
 </div>
 
-<!-- RUN -->
-<button class="btn-run" id="run-btn" onclick="runSchedule()">Run Schedule for All Weeks</button>
+<!-- PREVIEW -->
+<div class="card">
+  <div class="card-head">
+    <h2>Schedule Preview</h2>
+    <button class="btn btn-ghost" onclick="loadPreview()">Refresh Preview</button>
+  </div>
+  <div class="results-note">Preview only. Workers cannot see this. It uses the current shift sizes and the submissions above.</div>
+  <div class="status" id="preview-status"></div>
+  <div id="preview-grid"><p class="empty-msg">Generating preview…</p></div>
+</div>
+
+<!-- CREATE -->
+<div class="create-row">
+  <div class="tooltip-wrap">
+    <button class="btn-run" id="create-btn" onclick="createSchedule()" title="This creates the schedule for everyone.">Create Schedule</button>
+    <span class="tooltip" role="tooltip">This creates the schedule for everyone.</span>
+  </div>
+  <div class="posted-info" id="posted-info"></div>
+</div>
 
 <div class="status" id="status-msg"></div>
-
-<!-- RESULTS -->
-<div class="card" id="results-card" style="display:none">
-  <h2>Schedule Results</h2>
-  <div class="results-note" id="results-note"></div>
-  <div id="result-grid"></div>
-</div>
 
 </div><!-- /tab-preview -->
 
@@ -467,6 +529,7 @@
     document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === `tab-${name}`));
     try { sessionStorage.setItem("adminTab", name); } catch {}
+    if (name === "preview" && adminToken && weeks.length > 0) loadPreview();
   }
 
   try {
@@ -592,7 +655,7 @@
       statusEl.textContent = `Saved. ${weeks.length} week${weeks.length !== 1 ? "s" : ""} open for workers.`;
       setTimeout(() => { statusEl.textContent = ""; }, 4000);
       loadPreferences();
-      loadResults();
+      loadPosted();
     } catch (err) {
       statusEl.textContent = `Could not save: ${err.message}`;
     }
@@ -646,6 +709,15 @@
     };
   }
 
+  // Shift sizes are NOT saved automatically. They are sent with each preview and
+  // only persisted when Create Schedule is pressed.
+  let savedSettings = currentSettings();
+
+  function updateSettingsBadge() {
+    const dirty = JSON.stringify(currentSettings()) !== JSON.stringify(savedSettings);
+    document.getElementById("settings-badge").classList.toggle("show", dirty);
+  }
+
   async function loadSettings() {
     try {
       const res = await fetch("/settings");
@@ -658,21 +730,13 @@
       document.getElementById("weekday-grid-0").addEventListener("input", () => syncGraveCapacity("weekday-grid"));
       document.getElementById("weekend-grid-0").addEventListener("input", () => syncGraveCapacity("weekend-grid"));
     } catch { /* keep defaults */ }
+    savedSettings = currentSettings();
+    updateSettingsBadge();
   }
 
-  let settingsTimer = null;
-  function scheduleSettingsSave() {
-    clearTimeout(settingsTimer);
-    settingsTimer = setTimeout(async () => {
-      try {
-        const res = await fetch("/settings", { method: "PUT", headers: authHeaders(), body: JSON.stringify(currentSettings()) });
-        if (res.status === 401) handleUnauthorized();
-      } catch { /* non-critical */ }
-    }, 500);
-  }
-  document.getElementById("weekday-grid").addEventListener("input", scheduleSettingsSave);
-  document.getElementById("weekend-grid").addEventListener("input", scheduleSettingsSave);
-  document.getElementById("yellows").addEventListener("change", scheduleSettingsSave);
+  document.getElementById("weekday-grid").addEventListener("input", updateSettingsBadge);
+  document.getElementById("weekend-grid").addEventListener("input", updateSettingsBadge);
+  document.getElementById("yellows").addEventListener("change", updateSettingsBadge);
 
   async function loadWorkers() {
     try {
@@ -840,67 +904,115 @@
 
   // ── Run Schedule ──────────────────────────────────────────────────────────
 
-  async function runSchedule() {
-    const btn = document.getElementById("run-btn");
-    const statusEl = document.getElementById("status-msg");
+  // ── Preview / Create ──────────────────────────────────────────────────────
 
-    if (weeks.length === 0) { showStatus("Set the scheduling period before running.", "error"); return; }
-    if (workers.length === 0) { showStatus("Add at least one worker before running.", "error"); return; }
-    if (preferences.length === 0) { showStatus("No workers have submitted preferences yet.", "error"); return; }
+  let previewData = null;   // last preview result, used to warn before creating
 
-    btn.disabled = true;
-    btn.textContent = "Running…";
+  function previewGuard() {
+    if (weeks.length === 0) return "Set the scheduling period on the Create Schedule tab first.";
+    if (workers.length === 0) return "Add workers on the Create Schedule tab first.";
+    if (preferences.length === 0) return "No workers have submitted preferences yet.";
+    return null;
+  }
+
+  async function loadPreview() {
+    const grid = document.getElementById("preview-grid");
+    const statusEl = document.getElementById("preview-status");
     statusEl.className = "status";
+    previewData = null;
 
+    const problem = previewGuard();
+    if (problem) {
+      grid.innerHTML = `<p class="empty-msg">${problem}</p>`;
+      return;
+    }
+
+    grid.innerHTML = '<p class="empty-msg">Generating preview…</p>';
     try {
-      const res = await fetch("/run_schedule", {
+      const res = await fetch("/preview_schedule", {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify(currentSettings())
       });
-
       if (res.status === 401) { handleUnauthorized(); return; }
-
       const data = await res.json();
+      if (!res.ok) {
+        grid.innerHTML = "";
+        showStatus(`Server error ${res.status}: ${JSON.stringify(data?.detail ?? data)}`, "error", [], statusEl);
+        return;
+      }
+      previewData = data.weeks;
+      renderResults(grid, data.weeks, currentSettings().yellows);
+      const failed = data.weeks.filter(w => w.error);
+      if (failed.length > 0) {
+        showStatus(`${failed.length} of ${data.weeks.length} weeks cannot be fully filled with the current shift sizes and submissions. Details are listed under each week.`, "error", [], statusEl);
+      }
+    } catch (err) {
+      grid.innerHTML = "";
+      showStatus(`Request failed: ${err.message}.`, "error", [], statusEl);
+    }
+  }
 
+  async function createSchedule() {
+    const btn = document.getElementById("create-btn");
+    const problem = previewGuard();
+    if (problem) { showStatus(problem, "error"); return; }
+
+    if (!previewData) await loadPreview();
+    if (!previewData) return;
+
+    const failed = previewData.filter(w => w.error).length;
+    let msg = "Create the schedule for everyone? Workers will be able to see it immediately.";
+    if (failed > 0) msg = `${failed} of ${previewData.length} weeks have unfilled shifts.\n\n` + msg;
+    if (!confirm(msg)) return;
+
+    btn.disabled = true;
+    btn.textContent = "Creating…";
+    document.getElementById("status-msg").className = "status";
+
+    try {
+      const res = await fetch("/create_schedule", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(currentSettings())
+      });
+      if (res.status === 401) { handleUnauthorized(); return; }
+      const data = await res.json();
       if (!res.ok) {
         showStatus(`Server error ${res.status}: ${JSON.stringify(data?.detail ?? data)}`, "error");
         return;
       }
-
-      renderResults(data.weeks, currentSettings().yellows, `Generated ${new Date().toLocaleString()}.`);
-      const failed = data.weeks.filter(w => w.error);
-      if (failed.length > 0) {
-        showStatus(`Could not fill all required slots in ${failed.length} of ${data.weeks.length} weeks. See details below.`, "error");
-      } else {
-        showStatus(`Schedules generated for all ${data.weeks.length} weeks.`, "success");
-      }
-      document.getElementById("results-card").scrollIntoView({ behavior: "smooth" });
-
+      savedSettings = currentSettings();
+      updateSettingsBadge();
+      renderPostedInfo(data);
+      showStatus("Schedule created. Workers can now see it on the shift picker page.", "success");
     } catch (err) {
       showStatus(`Request failed: ${err.message}.`, "error");
     } finally {
       btn.disabled = false;
-      btn.textContent = "Run Schedule for All Weeks";
+      btn.textContent = "Create Schedule";
     }
   }
 
-  async function loadResults() {
+  function renderPostedInfo(published) {
+    const el = document.getElementById("posted-info");
+    if (!published || !published.created_at) {
+      el.innerHTML = "No schedule has been posted yet. Workers see nothing until you create one.";
+      return;
+    }
+    const when = new Date(published.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+    el.innerHTML = `Posted schedule created <strong>${when}</strong>. <a href="/index.html?view=schedule" target="_blank">View as workers see it</a>`;
+  }
+
+  async function loadPosted() {
     try {
-      const res = await fetch("/results", { headers: authHeaders() });
-      if (res.status === 401) { handleUnauthorized(); return; }
+      const res = await fetch("/schedule");
       if (!res.ok) return;
-      const data = await res.json();
-      if (data.weeks && data.weeks.length > 0) {
-        renderResults(data.weeks, currentSettings().yellows, "Results from the last run. Run again to refresh.");
-      } else {
-        document.getElementById("results-card").style.display = "none";
-      }
+      renderPostedInfo(await res.json());
     } catch { /* ignore */ }
   }
 
-  function showStatus(msg, type, items = []) {
-    const el = document.getElementById("status-msg");
+  function showStatus(msg, type, items = [], el = document.getElementById("status-msg")) {
     el.className = `status ${type}`;
     if (items.length > 0) {
       el.innerHTML = `${msg}<ul style="margin-top:6px;padding-left:18px;">${items.map(s => `<li>${s}</li>`).join("")}</ul>`;
@@ -911,12 +1023,7 @@
 
   // ── Render Results ────────────────────────────────────────────────────────
 
-  function renderResults(weekResults, yellows, note) {
-    const card = document.getElementById("results-card");
-    const grid = document.getElementById("result-grid");
-    card.style.display = "block";
-    document.getElementById("results-note").textContent = note || "";
-
+  function renderResults(grid, weekResults, yellows) {
     grid.innerHTML = weekResults.map(w => {
       const monday = parseISO(w.week);
       const schedule = w.schedule;
@@ -951,10 +1058,10 @@
 
   // Init — everything lives on the server so the panel survives reloads and restarts
   async function loadAll() {
-    await Promise.all([loadWeeks(), loadSettings(), loadWorkers()]);
+    await Promise.all([loadWeeks(), loadSettings(), loadWorkers(), loadPosted()]);
     if (!adminToken) return;
     await loadPreferences();
-    await loadResults();
+    if (document.getElementById("tab-preview").classList.contains("active")) loadPreview();
   }
 
   renderWorkers();

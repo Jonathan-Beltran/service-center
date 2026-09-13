@@ -190,6 +190,54 @@
 
     .no-user { opacity: 0.45; pointer-events: none; }
 
+    /* View toggle: pick shifts / posted schedule */
+    .view-toggle {
+      display: inline-flex;
+      background: #e9ecef;
+      border-radius: 8px;
+      padding: 3px;
+      gap: 2px;
+    }
+    .view-btn {
+      padding: 6px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #555;
+      background: none;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .view-btn.active { background: white; color: #3b5bdb; box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+
+    /* Posted schedule */
+    .posted-note { font-size: 0.85rem; color: #666; margin-bottom: 14px; }
+    .week-result {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .week-result h2 { font-size: 0.95rem; margin-bottom: 10px; }
+    .result-scroll { overflow-x: auto; }
+    .result-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; min-width: 600px; }
+    .result-table th, .result-table td {
+      border: 1px solid #e0e0e0;
+      padding: 7px 5px;
+      text-align: center;
+      vertical-align: top;
+    }
+    .result-table th { background: #f0f4ff; font-weight: 600; }
+    .result-table td.shift-label { background: #f8f9fa; font-weight: 600; font-size: 0.74rem; text-align: left; padding-left: 10px; white-space: nowrap; }
+    .result-table td.mine { background: #edf2ff; }
+    .chips { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+    .chip { background: #dee2e6; color: #333; border-radius: 4px; padding: 2px 7px; font-size: 0.72rem; }
+    .chip.mine { background: #3b5bdb; color: white; font-weight: 700; }
+    .empty-slot { color: #ccc; }
+    .mine-legend { font-size: 0.8rem; color: #666; margin-bottom: 12px; }
+    .mine-legend .chip { margin-right: 4px; }
+
     /* ── Mobile ────────────────────────────────────────────────────── */
     .day-tabs { display: none; }
 
@@ -244,6 +292,8 @@
 
       .output-section { margin-top: 20px; }
       .submit-btn, .copy-btn { flex: 1; padding: 11px; font-size: 0.9rem; text-align: center; }
+      .view-toggle { width: 100%; }
+      .view-btn { flex: 1; text-align: center; }
     }
   </style>
 </head>
@@ -254,9 +304,15 @@
     <select id="user-select">
       <option value="">— Loading… —</option>
     </select>
-    <span class="hint">Pick a week, then click shifts in order of preference</span>
+    <div class="view-toggle">
+      <button class="view-btn active" data-view="pick" onclick="showView('pick')">Pick Shifts</button>
+      <button class="view-btn" data-view="schedule" onclick="showView('schedule')">Posted Schedule</button>
+    </div>
   </header>
 
+  <!-- PICK SHIFTS VIEW -->
+  <div id="pick-view">
+  <p class="hint" style="margin:0 0 12px">Pick a week, then click shifts in order of preference.</p>
   <div class="week-tabs" id="week-tabs"></div>
   <div class="notice" id="notice" style="display:none"></div>
 
@@ -274,6 +330,13 @@
       <span class="submit-status" id="submit-status" style="display:none"></span>
     </div>
   </div>
+  </div><!-- /pick-view -->
+
+  <!-- POSTED SCHEDULE VIEW -->
+  <div id="schedule-view" style="display:none">
+    <div class="posted-note" id="posted-note">Loading schedule…</div>
+    <div id="schedule-grid"></div>
+  </div>
 
   <script>
     const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -289,6 +352,9 @@
       "6pm – 9pm",
       "9pm – 12am"
     ];
+
+    const SHIFT_LABELS = ["12am – 3am", "3am – 6am", "6am – 9am", "9am – 12pm", "12pm – 3pm", "3pm – 6pm", "6pm – 9pm", "9pm – 12am"];
+    let posted = null;       // the schedule the supervisor created, or null
 
     let weeks = [];          // ISO dates of each Monday, from the server
     let activeWeek = null;   // ISO date of the week being edited
@@ -451,6 +517,63 @@
       });
     }
 
+    // ── Views ───────────────────────────────────────────────────────────────
+
+    function showView(name) {
+      document.querySelectorAll(".view-btn").forEach(b => b.classList.toggle("active", b.dataset.view === name));
+      document.getElementById("pick-view").style.display = name === "pick" ? "" : "none";
+      document.getElementById("schedule-view").style.display = name === "schedule" ? "" : "none";
+    }
+
+    // ── Posted schedule ─────────────────────────────────────────────────────
+
+    function renderPosted() {
+      const note = document.getElementById("posted-note");
+      const grid = document.getElementById("schedule-grid");
+
+      if (!posted || !posted.created_at || posted.weeks.length === 0) {
+        note.textContent = "The schedule has not been posted yet. Check back after the supervisor creates it.";
+        grid.innerHTML = "";
+        return;
+      }
+
+      const when = new Date(posted.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+      note.innerHTML = `Posted ${when}.` + (currentUser
+        ? ` <span class="mine-legend">Your shifts are highlighted: <span class="chip mine">${currentUser}</span></span>`
+        : " Select your initials above to highlight your shifts.");
+
+      grid.innerHTML = posted.weeks.map(w => {
+        const monday = parseISO(w.week);
+        let html = `<div class="week-result"><h2>Week of ${weekLabel(w.week)}</h2><div class="result-scroll"><table class="result-table">
+          <thead><tr><th>Shift</th>${days.map((d, i) => `<th>${dayShorts[i]} ${numericDate(addDays(monday, i))}</th>`).join("")}</tr></thead><tbody>`;
+        SHIFT_LABELS.forEach((label, si) => {
+          html += `<tr><td class="shift-label">${label}</td>`;
+          days.forEach((_, di) => {
+            const assigned = w.schedule[di]?.[si] ?? [];
+            const mine = currentUser && assigned.includes(currentUser);
+            if (assigned.length === 0) {
+              html += `<td><span class="empty-slot">—</span></td>`;
+            } else {
+              html += `<td class="${mine ? "mine" : ""}"><div class="chips">${assigned.map(n => `<span class="chip${n === currentUser ? " mine" : ""}">${n}</span>`).join("")}</div></td>`;
+            }
+          });
+          html += "</tr>";
+        });
+        return html + "</tbody></table></div></div>";
+      }).join("");
+    }
+
+    async function loadPosted() {
+      try {
+        const res = await fetch("/schedule");
+        if (!res.ok) throw new Error();
+        posted = await res.json();
+      } catch {
+        posted = null;
+      }
+      renderPosted();
+    }
+
     // ── Server I/O ──────────────────────────────────────────────────────────
 
     async function submitPreference() {
@@ -523,6 +646,7 @@
       }
       renderWeekTabs();
       renderWeek();
+      renderPosted();
     });
 
     async function loadWorkers() {
@@ -572,7 +696,9 @@
 
     loadWorkers();
     loadWeeks();
+    loadPosted();
     initDayTabs();
+    if (new URLSearchParams(location.search).get("view") === "schedule") showView("schedule");
   </script>
 </body>
 </html>
