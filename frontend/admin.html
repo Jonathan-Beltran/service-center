@@ -195,7 +195,6 @@
     .result-table td.clickable { cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: none; }
     #preview-grid.dragging .result-table td.clickable:hover { box-shadow: none; }
     .result-table td.clickable:hover { box-shadow: inset 0 0 0 2px #74c69d; }
-    .incentive-tag { display: block; font-size: 0.62rem; font-weight: 700; color: #2b8a3e; margin-top: 3px; letter-spacing: 0.03em; }
     .swatch { display: inline-block; width: 28px; height: 18px; border-radius: 4px; background: #e6f9e6; border: 1px solid #b7e4c7; vertical-align: middle; margin-right: 4px; }
     .legend { display: flex; gap: 16px; font-size: 0.8rem; color: #666; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
     .legend .slot { vertical-align: middle; margin-right: 4px; }
@@ -294,7 +293,7 @@
 
 <div class="card">
   <h2>Schedule Preview</h2>
-  <div class="results-note">This is the empty schedule workers will fill in, built from the period and shift sizes on the Create Schedule tab. <strong>Click a cell, or click and drag across cells, to mark them as incentive pay.</strong> Do the same on a green cell to unmark.</div>
+  <div class="results-note">This is the empty schedule workers will fill in, built from the period and shift sizes on the Create Schedule tab. Click or drag, to mark shifts as incentive pay.</div>
   <div class="legend" id="preview-legend">
     <span><span class="slot"></span> Required slot</span>
     <span id="legend-yellow"><span class="slot yellow"></span> Yellow (optional extra) slot</span>
@@ -642,11 +641,10 @@
           const yellowHere = isYellowShift && di <= 4 && cap > 0;
           const inc = isIncentive(draft, week, di, si);
           const attrs = `class="clickable${inc ? " incentive" : ""}" data-week="${week}" data-day="${di}" data-shift="${si}" title="Click or drag to ${inc ? "remove" : "mark as"} incentive pay"`;
-          const tag = `<span class="incentive-tag"${inc ? "" : " hidden"}>INCENTIVE</span>`;
-          if (cap <= 0) { html += `<td ${attrs}><span class="empty-slot">—</span>${tag}</td>`; return; }
+          if (cap <= 0) { html += `<td ${attrs}><span class="empty-slot">—</span></td>`; return; }
           const slots = [];
           for (let k = 0; k < cap; k++) slots.push(`<span class="slot${yellowHere && k === cap - 1 ? " yellow" : ""}"></span>`);
-          html += `<td ${attrs}><div class="chips">${slots.join("")}</div>${tag}</td>`;
+          html += `<td ${attrs}><div class="chips">${slots.join("")}</div></td>`;
         });
         html += "</tr>";
       });
@@ -667,7 +665,6 @@
 
     td.classList.toggle("incentive", on);
     td.title = `Click or drag to ${on ? "remove" : "mark as"} incentive pay`;
-    td.querySelector(".incentive-tag").hidden = !on;
   }
 
   // Click or drag across cells. The first cell decides whether the gesture
