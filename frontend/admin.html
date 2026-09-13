@@ -264,6 +264,30 @@
     }
     .empty-slot { color: #ccc; }
 
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 6px;
+      border-bottom: 2px solid #e0e0e0;
+      margin-bottom: 22px;
+    }
+    .tab {
+      padding: 10px 18px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #666;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      cursor: pointer;
+      transition: color 0.12s, border-color 0.12s;
+    }
+    .tab:hover { color: #3b5bdb; }
+    .tab.active { color: #3b5bdb; border-bottom-color: #3b5bdb; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
     /* Scheduling period */
     .period-row {
       display: grid;
@@ -328,6 +352,13 @@
 </div>
 
 <h1>Supervisor Panel</h1>
+
+<div class="tabs">
+  <button class="tab active" data-tab="create" onclick="showTab('create')">Create Schedule</button>
+  <button class="tab" data-tab="preview" onclick="showTab('preview')">Preview Schedule</button>
+</div>
+
+<div class="tab-panel active" id="tab-create">
 
 <!-- SCHEDULING PERIOD -->
 <div class="card">
@@ -399,6 +430,10 @@
   </div>
 </div>
 
+</div><!-- /tab-create -->
+
+<div class="tab-panel" id="tab-preview">
+
 <!-- WORKER PREFERENCES -->
 <div class="card">
   <h2>Submitted Shifts</h2>
@@ -423,7 +458,22 @@
   <div id="result-grid"></div>
 </div>
 
+</div><!-- /tab-preview -->
+
 <script>
+  // ── Tabs ─────────────────────────────────────────────────────────────────
+
+  function showTab(name) {
+    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === `tab-${name}`));
+    try { sessionStorage.setItem("adminTab", name); } catch {}
+  }
+
+  try {
+    const savedTab = sessionStorage.getItem("adminTab");
+    if (savedTab === "preview") showTab("preview");
+  } catch {}
+
   // ── Auth ─────────────────────────────────────────────────────────────────
 
   let adminToken = sessionStorage.getItem("adminToken");
