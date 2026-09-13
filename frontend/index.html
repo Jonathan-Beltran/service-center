@@ -101,11 +101,24 @@
 
     .shift:hover { background: #dde8ff; }
 
+    .shift.incentive { background: #e6f9e6; border-color: #b7e4c7; }
+    .shift.incentive:hover { background: #d3f9d8; }
+    .shift.incentive::after {
+      content: "INCENTIVE PAY";
+      display: block;
+      font-size: 0.6rem;
+      font-weight: 700;
+      color: #2b8a3e;
+      letter-spacing: 0.03em;
+      margin-top: 2px;
+    }
+
     .shift.selected {
       background: #3b5bdb;
       color: white;
       border-color: #2f4ac7;
     }
+    .shift.selected.incentive::after { color: #c3fad0; }
 
     .rank-badge {
       position: absolute;
@@ -231,6 +244,8 @@
     .result-table th { background: #f0f4ff; font-weight: 600; }
     .result-table td.shift-label { background: #f8f9fa; font-weight: 600; font-size: 0.74rem; text-align: left; padding-left: 10px; white-space: nowrap; }
     .result-table td.mine { background: #edf2ff; }
+    .result-table td.incentive { background: #e6f9e6; }
+    .result-table td.mine.incentive { background: #d8f3dc; }
     .chips { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
     .chip { background: #dee2e6; color: #333; border-radius: 4px; padding: 2px 7px; font-size: 0.72rem; }
     .chip.mine { background: #3b5bdb; color: white; font-weight: 700; }
@@ -354,7 +369,12 @@
     ];
 
     const SHIFT_LABELS = ["12am – 3am", "3am – 6am", "6am – 9am", "9am – 12pm", "12pm – 3pm", "3pm – 6pm", "6pm – 9pm", "9pm – 12am"];
-    let posted = null;       // the schedule the supervisor created, or null
+    let posted = null;       // the final schedule the supervisor posted, or null
+    let incentives = {};     // week -> [[day, shift], ...] marked as incentive pay
+
+    function isIncentive(week, di, si) {
+      return (incentives[week] || []).some(c => c[0] === di && c[1] === si);
+    }
 
     let weeks = [];          // ISO dates of each Monday, from the server
     let activeWeek = null;   // ISO date of the week being edited
@@ -427,7 +447,7 @@
           const isSelected = rank !== -1;
 
           const shiftEl = document.createElement("div");
-          shiftEl.className = "shift" + (isSelected ? " selected" : "");
+          shiftEl.className = "shift" + (isSelected ? " selected" : "") + (isIncentive(activeWeek, dayIndex, shiftIndex) ? " incentive" : "");
           shiftEl.innerHTML = `${shift}${isSelected ? `<span class="rank-badge">${rank + 1}</span>` : ""}`;
           shiftEl.onclick = () => toggleShift(dayIndex, shiftIndex);
 
@@ -538,7 +558,8 @@
       }
 
       const when = new Date(posted.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-      note.innerHTML = `Posted ${when}.` + (currentUser
+      const hasInc = Object.keys(incentives).length > 0;
+      note.innerHTML = `Posted ${when}.` + (hasInc ? ` <span class="mine-legend">Green cells are incentive pay.</span>` : "") + (currentUser
         ? ` <span class="mine-legend">Your shifts are highlighted: <span class="chip mine">${currentUser}</span></span>`
         : " Select your initials above to highlight your shifts.");
 
@@ -551,10 +572,11 @@
           days.forEach((_, di) => {
             const assigned = w.schedule[di]?.[si] ?? [];
             const mine = currentUser && assigned.includes(currentUser);
+            const cls = [mine ? "mine" : "", isIncentive(w.week, di, si) ? "incentive" : ""].filter(Boolean).join(" ");
             if (assigned.length === 0) {
-              html += `<td><span class="empty-slot">—</span></td>`;
+              html += `<td class="${cls}"><span class="empty-slot">—</span></td>`;
             } else {
-              html += `<td class="${mine ? "mine" : ""}"><div class="chips">${assigned.map(n => `<span class="chip${n === currentUser ? " mine" : ""}">${n}</span>`).join("")}</div></td>`;
+              html += `<td class="${cls}"><div class="chips">${assigned.map(n => `<span class="chip${n === currentUser ? " mine" : ""}">${n}</span>`).join("")}</div></td>`;
             }
           });
           html += "</tr>";
@@ -660,6 +682,7 @@
       } catch { /* handled below */ }
 
       weeks = pub ? (pub.weeks || []) : [];
+      incentives = pub ? (pub.incentives || {}) : {};
       const workers = pub ? (pub.workers || []) : [];
 
       if (!pub) {

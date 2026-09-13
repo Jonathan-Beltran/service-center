@@ -60,6 +60,7 @@ def admin_login(body: LoginRequest):
 #   weeks      ISO date of every Monday in that range (computed)
 #   settings   {"weekdays": [8 ints], "weekends": [8 ints], "yellows": bool}
 #   workers    [{"initials", "points", "doubles"}, ...]
+#   incentives {"2026-09-21": [[day, shift], ...]}   shifts marked as incentive pay
 #
 # store = {
 #   "draft":          setup being edited on the Create Schedule tab (supervisor only)
@@ -76,7 +77,7 @@ DEFAULT_SETTINGS = {
 }
 
 def _empty_setup() -> dict:
-    return {"start": None, "end": None, "weeks": [], "settings": deepcopy(DEFAULT_SETTINGS), "workers": []}
+    return {"start": None, "end": None, "weeks": [], "settings": deepcopy(DEFAULT_SETTINGS), "workers": [], "incentives": {}}
 
 def _empty_store() -> dict:
     return {
@@ -129,6 +130,7 @@ class SetupRequest(BaseModel):
     end: Optional[date] = None
     settings: Settings
     workers: List[WorkerEntry]
+    incentives: Dict[str, List[List[int]]] = {}
 
 def _monday_of(d: date) -> date:
     return d - timedelta(days=d.weekday())
@@ -159,12 +161,29 @@ def _build_setup(body: SetupRequest) -> dict:
             continue
         seen.add(initials)
         workers.append({"initials": initials, "points": w.points, "doubles": w.doubles})
+
+    weeks = _weeks_between(body.start, body.end)
+    incentives: Dict[str, List[List[int]]] = {}
+    for week, cells in body.incentives.items():
+        if week not in weeks:
+            continue
+        cleaned = []
+        for c in cells:
+            if len(c) != 2 or not (0 <= c[0] <= 6) or not (0 <= c[1] <= 7):
+                raise HTTPException(status_code=400, detail=f"Invalid incentive cell {c}")
+            cell = [int(c[0]), int(c[1])]
+            if cell not in cleaned:
+                cleaned.append(cell)
+        if cleaned:
+            incentives[week] = cleaned
+
     return {
         "start": body.start.isoformat() if body.start else None,
         "end": body.end.isoformat() if body.end else None,
-        "weeks": _weeks_between(body.start, body.end),
+        "weeks": weeks,
         "settings": body.settings.model_dump(),
         "workers": workers,
+        "incentives": incentives,
     }
 
 # ── Draft (supervisor only) ───────────────────────────────────────────────────

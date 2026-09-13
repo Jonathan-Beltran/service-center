@@ -15,7 +15,9 @@ How scheduling works
   1. Create Schedule: set the period (start and end dates), shift sizes, and
      import workers. This is a draft. It saves as you type, but workers see
      none of it.
-  2. Preview Schedule: shows the empty schedule built from the draft. Pressing
+  2. Preview Schedule: shows the empty schedule built from the draft. Click a
+     cell to mark that shift as incentive pay (green); workers see the same
+     green marking when picking shifts and on the posted schedule. Pressing
      "Create Schedule" publishes it. Workers can then open index.html, pick
      their initials, and rank shifts for each week. Coming back later reloads
      what they already submitted. Pressing Create Schedule again re-publishes

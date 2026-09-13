@@ -190,6 +190,11 @@
     /* Empty slots in the preview */
     .slot { display: inline-block; width: 28px; height: 18px; border: 1.5px dashed #b8c4f0; border-radius: 4px; background: #f8f9ff; }
     .slot.yellow { border-color: #ffd43b; background: #fffbe6; }
+    .result-table td.incentive { background: #e6f9e6; }
+    .result-table td.clickable { cursor: pointer; }
+    .result-table td.clickable:hover { box-shadow: inset 0 0 0 2px #74c69d; }
+    .incentive-tag { display: block; font-size: 0.62rem; font-weight: 700; color: #2b8a3e; margin-top: 3px; letter-spacing: 0.03em; }
+    .swatch { display: inline-block; width: 28px; height: 18px; border-radius: 4px; background: #e6f9e6; border: 1px solid #b7e4c7; vertical-align: middle; margin-right: 4px; }
     .legend { display: flex; gap: 16px; font-size: 0.8rem; color: #666; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
     .legend .slot { vertical-align: middle; margin-right: 4px; }
   </style>
@@ -287,10 +292,11 @@
 
 <div class="card">
   <h2>Schedule Preview</h2>
-  <div class="results-note">This is the empty schedule workers will fill in, built from the period and shift sizes on the Create Schedule tab.</div>
+  <div class="results-note">This is the empty schedule workers will fill in, built from the period and shift sizes on the Create Schedule tab. <strong>Click a cell to mark it as incentive pay.</strong> Click again to unmark.</div>
   <div class="legend" id="preview-legend">
     <span><span class="slot"></span> Required slot</span>
-    <span><span class="slot yellow"></span> Yellow (optional extra) slot</span>
+    <span id="legend-yellow"><span class="slot yellow"></span> Yellow (optional extra) slot</span>
+    <span><span class="swatch"></span> Incentive pay</span>
   </div>
   <div id="preview-grid"></div>
 </div>
@@ -351,7 +357,11 @@
 
   // ── State ─────────────────────────────────────────────────────────────────
 
-  let draft = { start: null, end: null, weeks: [], settings: null, workers: [] };  // being edited
+  let draft = { start: null, end: null, weeks: [], settings: null, workers: [], incentives: {} };  // being edited
+
+  function isIncentive(setup, week, di, si) {
+    return !!(setup && setup.incentives && (setup.incentives[week] || []).some(c => c[0] === di && c[1] === si));
+  }
   let published = null;   // what workers currently see
   let preferences = [];   // [{ initials, weeks: { isoMonday: [[day, shift], ...] } }]
   let results = null;     // last run
@@ -453,7 +463,8 @@
         weekends: getCapacities("weekend-grid"),
         yellows: document.getElementById("yellows").checked
       },
-      workers: draft.workers
+      workers: draft.workers,
+      incentives: draft.incentives || {}
     };
   }
 
@@ -572,7 +583,7 @@
 
   function setupsDiffer(a, b) {
     if (!a || !b) return true;
-    const strip = x => JSON.stringify({ weeks: x.weeks, settings: x.settings, workers: x.workers });
+    const strip = x => JSON.stringify({ weeks: x.weeks, settings: x.settings, workers: x.workers, incentives: x.incentives || {} });
     return strip(a) !== strip(b);
   }
 
@@ -603,7 +614,7 @@
       grid.innerHTML = '<p class="empty-msg">Pick a start and end date on the Create Schedule tab to see the preview.</p>';
       return;
     }
-    document.getElementById("preview-legend").style.display = s.yellows ? "flex" : "none";
+    document.getElementById("legend-yellow").style.display = s.yellows ? "" : "none";
 
     grid.innerHTML = draft.weeks.map(week => {
       const monday = parseISO(week);
@@ -615,15 +626,28 @@
         DAY_LABELS.forEach((_, di) => {
           const cap = di <= 4 ? s.weekdays[si] : s.weekends[si];
           const yellowHere = isYellowShift && di <= 4 && cap > 0;
-          if (cap <= 0) { html += `<td><span class="empty-slot">—</span></td>`; return; }
+          const inc = isIncentive(draft, week, di, si);
+          const attrs = `class="clickable${inc ? " incentive" : ""}" onclick="toggleIncentive('${week}', ${di}, ${si})" title="Click to ${inc ? "remove" : "mark as"} incentive pay"`;
+          const tag = inc ? `<span class="incentive-tag">INCENTIVE</span>` : "";
+          if (cap <= 0) { html += `<td ${attrs}><span class="empty-slot">—</span>${tag}</td>`; return; }
           const slots = [];
           for (let k = 0; k < cap; k++) slots.push(`<span class="slot${yellowHere && k === cap - 1 ? " yellow" : ""}"></span>`);
-          html += `<td><div class="chips">${slots.join("")}</div></td>`;
+          html += `<td ${attrs}><div class="chips">${slots.join("")}</div>${tag}</td>`;
         });
         html += "</tr>";
       });
       return html + "</tbody></table></div></div>";
     }).join("");
+  }
+
+  function toggleIncentive(week, di, si) {
+    if (!draft.incentives) draft.incentives = {};
+    const cells = draft.incentives[week] || [];
+    const idx = cells.findIndex(c => c[0] === di && c[1] === si);
+    if (idx === -1) cells.push([di, si]); else cells.splice(idx, 1);
+    if (cells.length > 0) draft.incentives[week] = cells; else delete draft.incentives[week];
+    renderPreview();
+    scheduleDraftSave();
   }
 
   async function createSchedule() {
@@ -805,9 +829,10 @@
         html += `<tr><td class="shift-label${isYellow ? " yellow" : ""}">${label}</td>`;
         DAY_LABELS.forEach((_, di) => {
           const assigned = w.schedule[di]?.[si] ?? [];
+          const cls = isIncentive(published, w.week, di, si) ? ' class="incentive"' : "";
           html += assigned.length > 0
-            ? `<td><div class="chips">${assigned.map(n => `<span class="chip">${n}</span>`).join("")}</div></td>`
-            : `<td><span class="empty-slot">—</span></td>`;
+            ? `<td${cls}><div class="chips">${assigned.map(n => `<span class="chip">${n}</span>`).join("")}</div></td>`
+            : `<td${cls}><span class="empty-slot">—</span></td>`;
         });
         html += "</tr>";
       });
