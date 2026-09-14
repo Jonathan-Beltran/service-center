@@ -7,12 +7,14 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
 from schedule import schedule
+from export_xlsx import build_workbook
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
@@ -352,6 +354,19 @@ def run_schedule():
 @app.get("/results", dependencies=[Depends(require_auth)])
 def get_results():
     return store["results"] or {"run_at": None, "yellows": False, "weeks": []}
+
+@app.get("/results.xlsx", dependencies=[Depends(require_auth)])
+def download_results():
+    """The last run as an Excel workbook, one sheet per week."""
+    if not store["results"] or not store["published"]:
+        raise HTTPException(status_code=400, detail="Run the schedule first")
+    data = build_workbook(store["results"], store["published"]["settings"])
+    first = store["results"]["weeks"][0]["week"] if store["results"]["weeks"] else "schedule"
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="schedule-{first}.xlsx"'},
+    )
 
 @app.post("/post_results", dependencies=[Depends(require_auth)])
 def post_results():
