@@ -160,6 +160,19 @@
     .submit-btn:hover { background: #276236; }
     .submit-btn:disabled { background: #aaa; cursor: not-allowed; }
 
+    .clear-btn {
+      padding: 7px 16px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      background: #fff0f0;
+      color: #c92a2a;
+      border: 1px solid #ffc9c9;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .clear-btn:hover { background: #ffe3e3; }
+    .clear-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
     .submit-status {
       font-size: 0.82rem;
       padding: 3px 10px;
@@ -272,7 +285,7 @@
 
       .shift { padding: 11px 12px; font-size: 0.85rem; margin-bottom: 8px; }
 
-      .submit-btn { flex: 1; padding: 11px; font-size: 0.9rem; text-align: center; }
+      .submit-btn, .clear-btn { flex: 1; padding: 11px; font-size: 0.9rem; text-align: center; }
       .view-toggle { width: 100%; }
       .view-btn { flex: 1; text-align: center; }
     }
@@ -304,6 +317,7 @@
 
   <div class="btn-row">
     <button class="submit-btn" id="submit-btn" onclick="submitPreference()">Submit all weeks</button>
+    <button class="clear-btn" id="clear-btn" onclick="clearWeek()">Clear this week</button>
     <span class="submit-status" id="submit-status" style="display:none"></span>
   </div>
   </div><!-- /pick-view -->
@@ -389,7 +403,15 @@
       });
     }
 
+    function updateClearButton() {
+      const btn = document.getElementById("clear-btn");
+      const n = activeWeek ? (selections[activeWeek] || []).length : 0;
+      btn.textContent = activeWeek ? `Clear week of ${shortDate(parseISO(activeWeek))}` : "Clear this week";
+      btn.disabled = !currentUser || n === 0;
+    }
+
     function renderWeek() {
+      updateClearButton();
       const week = document.getElementById("week");
       week.innerHTML = "";
       if (!activeWeek) return;
@@ -444,6 +466,16 @@
       document.querySelectorAll("#week .day").forEach((el, i) => {
         el.classList.toggle("mobile-active", i === activeDayTab);
       });
+    }
+
+    function clearWeek() {
+      if (!currentUser || !activeWeek) return;
+      const picks = currentPicks();
+      if (picks.length === 0) return;
+      if (!confirm(`Clear all ${picks.length} pick${picks.length !== 1 ? "s" : ""} for the week of ${weekLabel(activeWeek)}?`)) return;
+      selections[activeWeek] = [];
+      renderWeekTabs();
+      renderWeek();
     }
 
     function toggleShift(dayIndex, shiftIndex) {
