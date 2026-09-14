@@ -46,6 +46,10 @@ MONTHS = ["January", "February", "March", "April", "May", "June", "July",
 MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sept", "Oct", "Nov", "Dec"]
 
 NO_FILL = PatternFill(fill_type=None)
+# Colours taken from the supervisor's own workbook (template2)
+YELLOW_FILL = PatternFill("solid", fgColor="FFFFFF00")
+INCENTIVE_FILL = {1: PatternFill("solid", fgColor="FF99CC00"), 2: PatternFill("solid", fgColor="FF008000")}
+YELLOW_SHIFTS = (3, 4, 5)   # 9am-12pm, 12pm-3pm, 3pm-6pm
 
 def _short(d: date) -> str:
     return f"{MONTHS_SHORT[d.month - 1]} {d.day}"
@@ -74,8 +78,17 @@ def _merge_containing(ws, cell):
             return rng
     return None
 
-def _fill_week(ws, week_iso: str, grid):
+def _incentive_level(published: dict, week_iso: str, di: int, si: int) -> int:
+    for c in (published or {}).get("incentives", {}).get(week_iso, []):
+        if c[0] == di and c[1] == si:
+            return c[2] if len(c) > 2 else 1
+    return 0
+
+def _fill_week(ws, week_iso: str, grid, published: dict):
     monday = date.fromisoformat(week_iso)
+    settings = (published or {}).get("settings") or {}
+    yellows = bool(settings.get("yellows"))
+    weekday_caps = settings.get("weekdays") or []
     ws["A1"].value = _title(monday)
 
     for i in range(7):
@@ -111,6 +124,11 @@ def _fill_week(ws, week_iso: str, grid):
                     if _is_black(cell):
                         cell.fill = copy(NO_FILL)
 
+            level = _incentive_level(published, week_iso, di, si)
+            yellow_slot = -1
+            if yellows and di <= 4 and si in YELLOW_SHIFTS and si < len(weekday_caps) and weekday_caps[si] > 0:
+                yellow_slot = weekday_caps[si] - 1      # the optional extra seat is the last one
+
             for k, cell in enumerate(slots):
                 if k < len(names):
                     if _is_black(cell):
@@ -120,7 +138,14 @@ def _fill_week(ws, week_iso: str, grid):
                 elif not _is_black(cell):
                     cell.value = None
 
-def build_workbook(results: dict, settings: dict = None) -> bytes:
+                if _is_black(cell):
+                    continue
+                if level:
+                    cell.fill = copy(INCENTIVE_FILL[level])
+                elif k == yellow_slot:
+                    cell.fill = copy(YELLOW_FILL)
+
+def build_workbook(results: dict, published: dict = None) -> bytes:
     wb = load_workbook(TEMPLATE)
     originals = list(wb.worksheets)
 
@@ -141,7 +166,7 @@ def build_workbook(results: dict, settings: dict = None) -> bytes:
         ws.page_margins = copy(master.page_margins)
         ws.print_options = copy(master.print_options)
         ws.sheet_properties.pageSetUpPr = copy(master.sheet_properties.pageSetUpPr)
-        _fill_week(ws, week["week"], week["schedule"])
+        _fill_week(ws, week["week"], week["schedule"], published)
 
     for ws in originals:
         wb.remove(ws)

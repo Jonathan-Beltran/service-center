@@ -62,7 +62,7 @@ def admin_login(body: LoginRequest):
 #   weeks      ISO date of every Monday in that range (computed)
 #   settings   {"weekdays": [8 ints], "weekends": [8 ints], "yellows": bool}
 #   workers    [{"initials", "points", "doubles"}, ...]
-#   incentives {"2026-09-21": [[day, shift], ...]}   shifts marked as incentive pay
+#   incentives {"2026-09-21": [[day, shift, level], ...]}   level 1 = incentive pay, 2 = double incentive
 #
 # store = {
 #   "draft":          setup being edited on the Create Schedule tab (supervisor only)
@@ -169,11 +169,12 @@ def _build_setup(body: SetupRequest) -> dict:
             continue
         cleaned = []
         for c in cells:
-            if len(c) != 2 or not (0 <= c[0] <= 6) or not (0 <= c[1] <= 7):
+            level = c[2] if len(c) == 3 else 1        # older drafts stored [day, shift]
+            if len(c) not in (2, 3) or not (0 <= c[0] <= 6) or not (0 <= c[1] <= 7) or level not in (1, 2):
                 raise HTTPException(status_code=400, detail=f"Invalid incentive cell {c}")
-            cell = [int(c[0]), int(c[1])]
-            if cell not in cleaned:
-                cleaned.append(cell)
+            cell = [int(c[0]), int(c[1]), int(level)]
+            cleaned = [x for x in cleaned if x[:2] != cell[:2]]   # one level per cell
+            cleaned.append(cell)
         if cleaned:
             incentives[week] = cleaned
 
@@ -357,7 +358,7 @@ def download_results():
     """The last run as an Excel workbook, one sheet per week."""
     if not store["results"] or not store["published"]:
         raise HTTPException(status_code=400, detail="Run the schedule first")
-    data = build_workbook(store["results"], store["published"]["settings"])
+    data = build_workbook(store["results"], store["published"])
     first = store["results"]["weeks"][0]["week"] if store["results"]["weeks"] else "schedule"
     return Response(
         content=data,

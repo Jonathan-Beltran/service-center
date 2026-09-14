@@ -103,6 +103,8 @@
 
     .shift.incentive { background: #e6f9e6; border-color: #b7e4c7; }
     .shift.incentive:hover { background: #d3f9d8; }
+    .shift.incentive2 { background: #a9dfb3; border-color: #2f9e44; }
+    .shift.incentive2:hover { background: #95d6a1; }
 
     .shift.selected {
       background: #3b5bdb;
@@ -270,8 +272,9 @@
 
     let incentives = {};     // week -> [[day, shift], ...] marked as incentive pay
 
-    function isIncentive(week, di, si) {
-      return (incentives[week] || []).some(c => c[0] === di && c[1] === si);
+    function incentiveLevel(week, di, si) {
+      const c = (incentives[week] || []).find(c => c[0] === di && c[1] === si);
+      return c ? (c[2] || 1) : 0;
     }
 
     let weeks = [];          // ISO dates of each Monday, from the server
@@ -353,7 +356,8 @@
           const isSelected = rank !== -1;
 
           const shiftEl = document.createElement("div");
-          shiftEl.className = "shift" + (isSelected ? " selected" : "") + (isIncentive(activeWeek, dayIndex, shiftIndex) ? " incentive" : "");
+          const lvl = incentiveLevel(activeWeek, dayIndex, shiftIndex);
+          shiftEl.className = "shift" + (isSelected ? " selected" : "") + (lvl === 2 ? " incentive2" : lvl === 1 ? " incentive" : "");
           shiftEl.innerHTML = `${shift}${isSelected ? `<span class="rank-badge">${rank + 1}</span>` : ""}`;
           shiftEl.onclick = () => toggleShift(dayIndex, shiftIndex);
 

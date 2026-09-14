@@ -192,10 +192,12 @@
     .slot { display: inline-block; width: 28px; height: 18px; border: 1.5px dashed #b8c4f0; border-radius: 4px; background: #f8f9ff; }
     .slot.yellow { border-color: #ffd43b; background: #fffbe6; }
     .result-table td.incentive { background: #e6f9e6; }
+    .result-table td.incentive2 { background: #a9dfb3; }
     .result-table td.clickable { cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: none; }
     #preview-grid.dragging .result-table td.clickable:hover { box-shadow: none; }
     .result-table td.clickable:hover { box-shadow: inset 0 0 0 2px #74c69d; }
     .swatch { display: inline-block; width: 28px; height: 18px; border-radius: 4px; background: #e6f9e6; border: 1px solid #b7e4c7; vertical-align: middle; margin-right: 4px; }
+    .swatch.double { background: #a9dfb3; border-color: #2f9e44; }
     .legend { display: flex; gap: 16px; font-size: 0.8rem; color: #666; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
     .legend .slot { vertical-align: middle; margin-right: 4px; }
   </style>
@@ -293,11 +295,12 @@
 
 <div class="card">
   <h2>Schedule Preview</h2>
-  <div class="results-note">This is the empty schedule workers will fill in, built from the period and shift sizes on the Create Schedule tab. Click or drag, to mark shifts as incentive pay.</div>
+  <div class="results-note">This is the empty schedule workers will fill in, built from the period and shift sizes on the Create Schedule tab. Click or drag to mark shifts as incentive pay. Each click cycles: incentive pay, double incentive pay, then off.</div>
   <div class="legend" id="preview-legend">
     <span><span class="slot"></span> Required slot</span>
     <span id="legend-yellow"><span class="slot yellow"></span> Yellow (optional extra) slot</span>
     <span><span class="swatch"></span> Incentive pay</span>
+    <span><span class="swatch double"></span> Double incentive pay</span>
   </div>
   <div id="preview-grid"></div>
 </div>
@@ -357,9 +360,13 @@
 
   let draft = { start: null, end: null, weeks: [], settings: null, workers: [], incentives: {} };  // being edited
 
-  function isIncentive(setup, week, di, si) {
-    return !!(setup && setup.incentives && (setup.incentives[week] || []).some(c => c[0] === di && c[1] === si));
+  // 0 = none, 1 = incentive pay, 2 = double incentive pay
+  function incentiveLevel(setup, week, di, si) {
+    const c = setup && setup.incentives && (setup.incentives[week] || []).find(c => c[0] === di && c[1] === si);
+    return c ? (c[2] || 1) : 0;
   }
+  function incentiveClass(level) { return level === 2 ? " incentive2" : level === 1 ? " incentive" : ""; }
+  const LEVEL_NAMES = ["off", "incentive pay", "double incentive pay"];
   let published = null;   // what workers currently see
   let preferences = [];   // [{ initials, weeks: { isoMonday: [[day, shift], ...] } }]
   let results = null;     // last run
@@ -635,8 +642,8 @@
         DAY_LABELS.forEach((_, di) => {
           const cap = di <= 4 ? s.weekdays[si] : s.weekends[si];
           const yellowHere = isYellowShift && di <= 4 && cap > 0;
-          const inc = isIncentive(draft, week, di, si);
-          const attrs = `class="clickable${inc ? " incentive" : ""}" data-week="${week}" data-day="${di}" data-shift="${si}" title="Click or drag to ${inc ? "remove" : "mark as"} incentive pay"`;
+          const lvl = incentiveLevel(draft, week, di, si);
+          const attrs = `class="clickable${incentiveClass(lvl)}" data-week="${week}" data-day="${di}" data-shift="${si}" title="${LEVEL_NAMES[lvl]} — click for ${LEVEL_NAMES[(lvl + 1) % 3]}"`;
           if (cap <= 0) { html += `<td ${attrs}><span class="empty-slot">—</span></td>`; return; }
           const slots = [];
           for (let k = 0; k < cap; k++) slots.push(`<span class="slot${yellowHere && k === cap - 1 ? " yellow" : ""}"></span>`);
@@ -648,23 +655,25 @@
     }).join("");
   }
 
-  // Set one cell's incentive state (idempotent) and mirror it in the draft.
-  function setIncentive(td, on) {
+  function cellLevel(td) { return td.classList.contains("incentive2") ? 2 : td.classList.contains("incentive") ? 1 : 0; }
+
+  // Set one cell's incentive level (idempotent) and mirror it in the draft.
+  function setIncentive(td, level) {
     const week = td.dataset.week;
     const di = parseInt(td.dataset.day), si = parseInt(td.dataset.shift);
     if (!draft.incentives) draft.incentives = {};
-    const cells = draft.incentives[week] || [];
-    const idx = cells.findIndex(c => c[0] === di && c[1] === si);
-    if (on && idx === -1) cells.push([di, si]);
-    if (!on && idx !== -1) cells.splice(idx, 1);
+    const cells = (draft.incentives[week] || []).filter(c => !(c[0] === di && c[1] === si));
+    if (level > 0) cells.push([di, si, level]);
     if (cells.length > 0) draft.incentives[week] = cells; else delete draft.incentives[week];
 
-    td.classList.toggle("incentive", on);
-    td.title = `Click or drag to ${on ? "remove" : "mark as"} incentive pay`;
+    td.classList.toggle("incentive", level === 1);
+    td.classList.toggle("incentive2", level === 2);
+    td.title = `${LEVEL_NAMES[level]} — click for ${LEVEL_NAMES[(level + 1) % 3]}`;
   }
 
-  // Click or drag across cells. The first cell decides whether the gesture
-  // marks or unmarks; every cell touched during the drag gets the same state.
+  // Click or drag across cells. The first cell advances one step (off →
+  // incentive → double → off) and every cell touched during the drag is set
+  // to that same level.
   const previewGrid = document.getElementById("preview-grid");
   let drag = null;   // { mode: bool, touched: Set<td> } while a gesture is active
 
@@ -678,7 +687,7 @@
     const td = e.target.closest("td.clickable");
     if (!td) return;
     e.preventDefault();
-    drag = { mode: !td.classList.contains("incentive"), touched: new Set([td]) };
+    drag = { mode: (cellLevel(td) + 1) % 3, touched: new Set([td]) };
     setIncentive(td, drag.mode);
     previewGrid.classList.add("dragging");
   });
@@ -848,7 +857,8 @@
         html += `<tr><td class="shift-label${isYellow ? " yellow" : ""}">${label}</td>`;
         DAY_LABELS.forEach((_, di) => {
           const assigned = w.schedule[di]?.[si] ?? [];
-          const cls = isIncentive(published, w.week, di, si) ? ' class="incentive"' : "";
+          const lvl = incentiveLevel(published, w.week, di, si);
+          const cls = lvl ? ` class="${incentiveClass(lvl).trim()}"` : "";
           html += assigned.length > 0
             ? `<td${cls}><div class="chips">${assigned.map(n => `<span class="chip">${n}</span>`).join("")}</div></td>`
             : `<td${cls}><span class="empty-slot">—</span></td>`;
