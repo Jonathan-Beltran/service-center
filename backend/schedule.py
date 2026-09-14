@@ -49,7 +49,7 @@ def schedule(data, days):
             username  = user[0]
             sel_times = user[2]
             doubles   = user[3]
-            num_picks = 2 if doubles else 3
+            num_picks = 3 if doubles else 2
             picks_left = num_picks
 
             # Resolve forced grave completions first
