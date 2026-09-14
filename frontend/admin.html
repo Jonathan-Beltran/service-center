@@ -497,6 +497,10 @@
   // This never affects what workers see.
   let saveTimer = null;
   function scheduleDraftSave() {
+    // Mirror the form into the draft object right away, so the preview and the
+    // banner reflect the edit even before the server round-trip finishes.
+    Object.assign(draft, formToDraft());
+    updateBanner();
     document.getElementById("save-state").textContent = "Saving draft…";
     clearTimeout(saveTimer);
     saveTimer = setTimeout(saveDraft, 400);
