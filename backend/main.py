@@ -69,7 +69,6 @@ def admin_login(body: LoginRequest):
 #   "published":      setup workers see, plus "created_at"; None until Create Schedule
 #   "preferences":    {"HM": {"2026-09-21": [[day, shift], ...], ...}, ...}
 #   "results":        last run of the algorithm, supervisor only: {"run_at", "weeks": [...]}
-#   "posted_results": results workers can see: {"posted_at", "weeks": [...]}; None until posted
 # }
 
 DEFAULT_SETTINGS = {
@@ -87,7 +86,6 @@ def _empty_store() -> dict:
         "published": None,
         "preferences": {},
         "results": None,
-        "posted_results": None,
     }
 
 def _load_store() -> dict:
@@ -227,9 +225,8 @@ def publish():
                 store["preferences"][initials] = by_week
             else:
                 del store["preferences"][initials]
-        for key in ("results", "posted_results"):
-            if store[key]:
-                store[key]["weeks"] = [r for r in store[key]["weeks"] if r["week"] in keep]
+        if store["results"]:
+            store["results"]["weeks"] = [r for r in store["results"]["weeks"] if r["week"] in keep]
         save_store()
     return published
 
@@ -368,31 +365,13 @@ def download_results():
         headers={"Content-Disposition": f'attachment; filename="schedule-{first}.xlsx"'},
     )
 
-@app.post("/post_results", dependencies=[Depends(require_auth)])
-def post_results():
-    """Make the last run visible to workers."""
-    if not store["results"]:
-        raise HTTPException(status_code=400, detail="Run the schedule first")
-    posted = deepcopy(store["results"])
-    posted["posted_at"] = _now()
-    with store_lock:
-        store["posted_results"] = posted
-        save_store()
-    return posted
-
-@app.get("/schedule")
-def get_schedule():
-    """The final schedule workers can see. Empty until results are posted."""
-    return store["posted_results"] or {"posted_at": None, "yellows": False, "weeks": []}
-
-
 # The pages are plain files that change on every deploy. Tell browsers to
 # re-check them on each load so nobody runs a stale copy against a new API.
 @app.middleware("http")
 async def no_cache_static(request, call_next):
     response = await call_next(request)
     if not request.url.path.startswith(("/admin/", "/draft", "/publish", "/published", "/preferences",
-                                        "/submit_preference", "/run_schedule", "/results", "/post_results", "/schedule")):
+                                        "/submit_preference", "/run_schedule", "/results")):
         response.headers["Cache-Control"] = "no-cache"
     return response
 

@@ -23,9 +23,9 @@ How scheduling works
      what they already submitted. Pressing Create Schedule again re-publishes
      the draft; submissions for weeks no longer in the period are deleted.
   3. Run Schedule: shows who has submitted, runs the algorithm on the published
-     schedule, and shows the result. Only the supervisor sees it until
-     "Post to Workers" is pressed. Workers then see it under "Posted Schedule"
-     on index.html with their own shifts highlighted.
+     schedule, and shows the result. Workers never see it in the app;
+     "Download Excel" produces a workbook (one sheet per week, laid out from
+     backend/template.xlsx) for the supervisor to share.
 
 Persistence
   All state (draft, published schedule, submissions, results) is saved to a

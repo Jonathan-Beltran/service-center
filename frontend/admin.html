@@ -328,7 +328,7 @@
 <div class="action-row">
   <div class="tooltip-wrap">
     <button class="btn-run" id="run-btn" onclick="runSchedule()">Run Schedule</button>
-    <span class="tooltip" role="tooltip">Assigns shifts from the submissions. Only you see the result until you post it.</span>
+    <span class="tooltip" role="tooltip">Assigns shifts from the submissions. Workers do not see the result; share it with the Excel download.</span>
   </div>
 </div>
 <div class="status" id="run-status"></div>
@@ -336,13 +336,7 @@
 <div class="card" id="results-card" style="display:none">
   <div class="card-head">
     <h2>Results</h2>
-    <div style="display:flex;gap:8px;align-items:center">
-    <button class="btn btn-ghost" id="xlsx-btn" onclick="downloadExcel()">Download Excel</button>
-    <div class="tooltip-wrap" style="flex:none;min-width:0">
-      <button class="btn btn-primary" id="post-btn" onclick="postResults()" title="This posts the schedule for everyone.">Post to Workers</button>
-      <span class="tooltip" role="tooltip">This posts the schedule for everyone.</span>
-    </div>
-    </div>
+    <button class="btn btn-primary" id="xlsx-btn" onclick="downloadExcel()">Download Excel</button>
   </div>
   <div class="results-note" id="results-note"></div>
   <div id="result-grid"></div>
@@ -369,7 +363,6 @@
   let published = null;   // what workers currently see
   let preferences = [];   // [{ initials, weeks: { isoMonday: [[day, shift], ...] } }]
   let results = null;     // last run
-  let posted = null;      // results workers can see
 
   // ── Date helpers ──────────────────────────────────────────────────────────
 
@@ -837,74 +830,12 @@
     }
   }
 
-  async function postResults() {
-    if (!results) return;
-    const failed = results.weeks.filter(w => w.error).length;
-    let msg = "Post this schedule for everyone? Workers will see it immediately.";
-    if (failed > 0) msg = `${failed} of ${results.weeks.length} weeks have unfilled shifts.\n\n` + msg;
-    if (!confirm(msg)) return;
-    const btn = document.getElementById("post-btn");
-    btn.disabled = true;
-    try {
-      const res = await fetch("/post_results", { method: "POST", headers: authHeaders() });
-      if (res.status === 401) { handleUnauthorized(); return; }
-      const data = await res.json();
-      if (!res.ok) { showStatus(data?.detail || `Server error ${res.status}`, "error", document.getElementById("run-status")); return; }
-      posted = data;
-      renderResults();
-      showStatus("Posted. Workers can now see the schedule on the shift picker page.", "success", document.getElementById("run-status"));
-    } catch (err) {
-      showStatus(`Request failed: ${err.message}.`, "error", document.getElementById("run-status"));
-    } finally {
-      btn.disabled = false;
-    }
-  }
-
-  async function downloadExcel() {
-    const btn = document.getElementById("xlsx-btn");
-    const statusEl = document.getElementById("run-status");
-    btn.disabled = true;
-    btn.textContent = "Preparing…";
-    try {
-      const res = await fetch("/results.xlsx", { headers: authHeaders() });
-      if (res.status === 401) { handleUnauthorized(); return; }
-      if (!res.ok) {
-        let detail = `Server error ${res.status}`;
-        try { detail = (await res.json()).detail || detail; } catch {}
-        showStatus(detail, "error", statusEl);
-        return;
-      }
-      const blob = await res.blob();
-      const match = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") || "");
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = match ? match[1] : "schedule.xlsx";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    } catch (err) {
-      showStatus(`Download failed: ${err.message}.`, "error", statusEl);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Download Excel";
-    }
-  }
-
   function renderResults() {
     const card = document.getElementById("results-card");
     if (!results || !results.run_at) { card.style.display = "none"; return; }
     card.style.display = "block";
 
-    let note = `Run ${fmtStamp(results.run_at)}. `;
-    if (posted && posted.posted_at && posted.run_at === results.run_at) {
-      note += `Posted to workers ${fmtStamp(posted.posted_at)}. <a href="/index.html?view=schedule" target="_blank">View as workers see it</a>`;
-    } else if (posted && posted.posted_at) {
-      note += `Not posted yet. Workers still see the schedule posted ${fmtStamp(posted.posted_at)}.`;
-    } else {
-      note += "Not posted yet. Only you can see this.";
-    }
-    document.getElementById("results-note").innerHTML = note;
+    document.getElementById("results-note").textContent = `Run ${fmtStamp(results.run_at)}. Only you can see this. Use Download Excel to share it.`;
 
     document.getElementById("result-grid").innerHTML = results.weeks.map(w => {
       const monday = parseISO(w.week);
@@ -944,13 +875,12 @@
 
   async function loadAll() {
     if (!adminToken) return;
-    const [d, pub, res, post] = await Promise.all([
-      fetchJSON("/draft", true), fetchJSON("/published"), fetchJSON("/results", true), fetchJSON("/schedule")
+    const [d, pub, res] = await Promise.all([
+      fetchJSON("/draft", true), fetchJSON("/published"), fetchJSON("/results", true)
     ]);
     if (d) draft = d;
     published = pub && pub.created_at ? pub : null;
     results = res && res.run_at ? res : null;
-    posted = post && post.posted_at ? post : null;
     draftToForm();
     updateBanner();
     renderResults();
