@@ -139,46 +139,13 @@
       margin-left: auto;
     }
 
-    .output-section { margin-top: 28px; }
-    .output-section h2 { font-size: 1rem; margin-bottom: 10px; }
-
-    .output-box {
-      background: white;
-      color: #222;
-      border-radius: 8px;
-      padding: 16px;
-      font-size: 0.88rem;
-      border: 1px solid #e0e0e0;
-      line-height: 1.8;
-    }
-    .output-box .week-heading {
-      font-weight: 700;
-      font-size: 0.82rem;
-      color: #3b5bdb;
-      margin-top: 8px;
-    }
-    .output-box .week-heading:first-child { margin-top: 0; }
-    .output-box .none { color: #aaa; font-style: italic; }
-
     .btn-row {
       display: flex;
       gap: 10px;
-      margin-top: 10px;
+      margin-top: 20px;
       align-items: center;
       flex-wrap: wrap;
     }
-
-    .copy-btn {
-      padding: 7px 16px;
-      font-size: 0.85rem;
-      background: #3b5bdb;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    .copy-btn:hover { background: #2f4ac7; }
-    .copy-btn:active { background: #253ea8; }
 
     .submit-btn {
       padding: 7px 20px;
@@ -305,8 +272,7 @@
 
       .shift { padding: 11px 12px; font-size: 0.85rem; margin-bottom: 8px; }
 
-      .output-section { margin-top: 20px; }
-      .submit-btn, .copy-btn { flex: 1; padding: 11px; font-size: 0.9rem; text-align: center; }
+      .submit-btn { flex: 1; padding: 11px; font-size: 0.9rem; text-align: center; }
       .view-toggle { width: 100%; }
       .view-btn { flex: 1; text-align: center; }
     }
@@ -336,14 +302,9 @@
     <div class="week no-user" id="week"></div>
   </div>
 
-  <div class="output-section">
-    <h2>Your selections</h2>
-    <div class="output-box" id="output">Select your initials to begin.</div>
-    <div class="btn-row">
-      <button class="submit-btn" id="submit-btn" onclick="submitPreference()">Submit all weeks</button>
-      <button class="copy-btn" id="copy-btn" onclick="copyOutput()">Copy</button>
-      <span class="submit-status" id="submit-status" style="display:none"></span>
-    </div>
+  <div class="btn-row">
+    <button class="submit-btn" id="submit-btn" onclick="submitPreference()">Submit all weeks</button>
+    <span class="submit-status" id="submit-status" style="display:none"></span>
   </div>
   </div><!-- /pick-view -->
 
@@ -458,7 +419,6 @@
       });
 
       updateDayVisibility();
-      updateOutput();
     }
 
     function initDayTabs() {
@@ -496,45 +456,6 @@
       }
       renderWeekTabs();
       renderWeek();
-    }
-
-    function updateOutput() {
-      const out = document.getElementById("output");
-      if (!currentUser) {
-        out.textContent = "Select your initials to begin.";
-        return;
-      }
-      if (weeks.length === 0) {
-        out.textContent = "No weeks are open for scheduling yet.";
-        return;
-      }
-      const totalPicks = weeks.reduce((n, w) => n + (selections[w] || []).length, 0);
-      if (totalPicks === 0) {
-        out.textContent = "No shifts selected yet.";
-        return;
-      }
-      out.innerHTML = weeks.map(w => {
-        const picks = selections[w] || [];
-        const monday = parseISO(w);
-        const lines = picks.length === 0
-          ? `<span class="none">No shifts selected</span>`
-          : picks.map((s, i) =>
-              `<span style="color:#888;font-size:0.78rem">${i + 1}.</span> ${days[s[0]]} ${numericDate(addDays(monday, s[0]))} &nbsp;<strong>${shifts[s[1]] ?? "3am – 6am"}</strong>`
-            ).join("<br>");
-        return `<div class="week-heading">Week of ${weekLabel(w)}</div>${lines}`;
-      }).join("");
-    }
-
-    function copyOutput() {
-      const out = document.getElementById("output");
-      const text = Array.from(out.childNodes)
-        .map(n => n.innerText ?? n.textContent)
-        .join("\n");
-      navigator.clipboard.writeText(text).then(() => {
-        const btn = document.getElementById("copy-btn");
-        btn.textContent = "Copied!";
-        setTimeout(() => btn.textContent = "Copy", 1500);
-      });
     }
 
     // ── Views ───────────────────────────────────────────────────────────────
