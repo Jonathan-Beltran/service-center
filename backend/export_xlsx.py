@@ -1,143 +1,153 @@
-"""Build an Excel workbook from a schedule run: one sheet per week.
+"""Build an Excel workbook from a schedule run, one sheet per week.
 
-Layout per sheet (mirrors the supervisor's existing spreadsheet):
-  row 1   title, merged across the day columns
-  row 2   dates ("Sept 14" ...)
-  row 3   blank, for notes such as holidays
-  row 4   day names
-  then one block per shift, as many rows as the shift's largest capacity.
-  Column A and the column after Sunday both carry the shift label.
-  Days with fewer slots than the block has rows get black cells; a day with a
-  single slot in a multi-row block is merged vertically instead.
+The layout is not drawn here. backend/template.xlsx (the supervisor's own
+spreadsheet) is the source of truth. One of its sheets is copied once per week
+and only the title, the date row, the notes row and the initials are changed.
+The master is the sheet with the fewest blacked-out slot cells, i.e. the most
+"normal" week, so a holiday week in the template does not black out slots
+for every exported week.
+Fonts, borders, merges, fills, column widths and row heights all come from
+the template untouched.
+
+Template geometry (rows on the sheet):
+  1      title, merged A1:I1
+  2      dates, B..H
+  3      notes (holidays etc.), cleared on export
+  4      day names
+  5..21  shift blocks, see SHIFT_ROWS
+Column A and I carry the shift labels; B..H are Monday..Sunday.
 """
+import os
+from copy import copy
 from datetime import date, timedelta
 from io import BytesIO
 
-from openpyxl import Workbook
-from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-from openpyxl.utils import get_column_letter
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
 
-SHIFT_LABELS = ["12am-3am", "3am-6am", "6am-9am", "9am-12pm", "12pm-3pm", "3pm-6pm", "6pm-9pm", "9pm-12am"]
-DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+TEMPLATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "template.xlsx")
+
+# shift index -> rows in the template that hold that shift's slots
+SHIFT_ROWS = {
+    0: [5],            # 12am-3am
+    1: [6],            # 3am-6am
+    2: [7, 8],         # 6am-9am
+    3: [9, 10, 11],    # 9am-12pm
+    4: [12, 13, 14],   # 12pm-3pm
+    5: [15, 16, 17],   # 3pm-6pm
+    6: [18, 19],       # 6pm-9pm
+    7: [20, 21],       # 9pm-12am
+}
+FIRST_DAY_COL = 2   # B = Monday
+DATE_ROW, NOTES_ROW = 2, 3
+
 MONTHS = ["January", "February", "March", "April", "May", "June", "July",
           "August", "September", "October", "November", "December"]
 MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sept", "Oct", "Nov", "Dec"]
 
-FIRST_DAY_COL = 2                 # column B
-LAST_DAY_COL = FIRST_DAY_COL + 6  # column H
-RIGHT_LABEL_COL = LAST_DAY_COL + 1
-
-thin = Side(style="thin", color="000000")
-thick = Side(style="medium", color="000000")
-BLACK = PatternFill("solid", fgColor="000000")
-CENTER = Alignment(horizontal="center", vertical="center")
-
-def _long_range(monday: date) -> str:
-    sunday = monday + timedelta(days=6)
-    if monday.month == sunday.month:
-        return f"{MONTHS[monday.month - 1]} {monday.day} - {MONTHS[sunday.month - 1]} {sunday.day}, {sunday.year}"
-    if monday.year == sunday.year:
-        return f"{MONTHS[monday.month - 1]} {monday.day} - {MONTHS[sunday.month - 1]} {sunday.day}, {sunday.year}"
-    return f"{MONTHS[monday.month - 1]} {monday.day}, {monday.year} - {MONTHS[sunday.month - 1]} {sunday.day}, {sunday.year}"
+NO_FILL = PatternFill(fill_type=None)
 
 def _short(d: date) -> str:
     return f"{MONTHS_SHORT[d.month - 1]} {d.day}"
 
-def _sheet_title(monday: date) -> str:
-    # Excel sheet names: max 31 chars, no / \ ? * [ ] :
+def _title(monday: date) -> str:
+    sunday = monday + timedelta(days=6)
+    return f"Weekly Schedule for {MONTHS[monday.month - 1]} {monday.day} - {MONTHS[sunday.month - 1]} {sunday.day}, {sunday.year}"
+
+def _sheet_name(monday: date) -> str:
     return f"{_short(monday)} - {_short(monday + timedelta(days=6))}"[:31]
 
-def _border(cell, left=thin, right=thin, top=thin, bottom=thin):
-    cell.border = Border(left=left, right=right, top=top, bottom=bottom)
+def _is_black(cell) -> bool:
+    """Solid black fill, whether stored as RGB or as the 'Text' theme colour (theme 1)."""
+    if cell.fill.fill_type != "solid":
+        return False
+    c = cell.fill.fgColor
+    if c.type == "rgb":
+        return str(c.rgb).upper().endswith("000000")
+    if c.type == "theme":
+        return c.theme == 1 and (c.tint or 0) == 0
+    return False
 
-def _write_week(ws, week_iso: str, grid, settings: dict):
+def _merge_containing(ws, cell):
+    for rng in ws.merged_cells.ranges:
+        if cell.coordinate in rng:
+            return rng
+    return None
+
+def _fill_week(ws, week_iso: str, grid):
     monday = date.fromisoformat(week_iso)
-    weekdays, weekends = settings["weekdays"], settings["weekends"]
+    ws["A1"].value = _title(monday)
 
-    # Column widths / base row heights
-    ws.column_dimensions["A"].width = 13
-    for c in range(FIRST_DAY_COL, LAST_DAY_COL + 1):
-        ws.column_dimensions[get_column_letter(c)].width = 13
-    ws.column_dimensions[get_column_letter(RIGHT_LABEL_COL)].width = 13
-
-    # Row 1: title
-    ws.merge_cells(start_row=1, start_column=FIRST_DAY_COL, end_row=1, end_column=LAST_DAY_COL)
-    t = ws.cell(row=1, column=FIRST_DAY_COL, value=f"Weekly Schedule for {_long_range(monday)}")
-    t.font = Font(name="Arial", size=20, underline="single")
-    t.alignment = CENTER
-    ws.row_dimensions[1].height = 30
-
-    # Row 2: dates, Row 3: blank notes row, Row 4: day names
     for i in range(7):
         col = FIRST_DAY_COL + i
-        d = ws.cell(row=2, column=col, value=_short(monday + timedelta(days=i)))
-        d.font = Font(name="Arial", bold=True, size=12)
-        d.alignment = CENTER
-        n = ws.cell(row=4, column=col, value=DAY_NAMES[i])
-        n.font = Font(name="Arial", bold=True, size=11)
-        n.alignment = CENTER
-        _border(n, top=thick, bottom=thick, left=thick if i == 0 else thin, right=thick if i == 6 else thin)
-    ws.row_dimensions[2].height = 22
-    ws.row_dimensions[3].height = 22
-    ws.row_dimensions[4].height = 20
+        ws.cell(row=DATE_ROW, column=col).value = _short(monday + timedelta(days=i))
+        ws.cell(row=NOTES_ROW, column=col).value = None   # holiday notes are week-specific
 
-    row = 5
-    for si, label in enumerate(SHIFT_LABELS):
-        rows = max(weekdays[si], weekends[si], 1)
-        top_row, bottom_row = row, row + rows - 1
-
-        # Shift labels on both sides, merged down the block
-        for col in (1, RIGHT_LABEL_COL):
-            if rows > 1:
-                ws.merge_cells(start_row=top_row, start_column=col, end_row=bottom_row, end_column=col)
-            c = ws.cell(row=top_row, column=col, value=label)
-            c.font = Font(name="Arial", bold=True, size=13)
-            c.alignment = CENTER
-            for r in range(top_row, bottom_row + 1):
-                _border(ws.cell(row=r, column=col), left=thick, right=thick,
-                        top=thick if r == top_row else thin, bottom=thick if r == bottom_row else thin)
-
+    for si, rows in SHIFT_ROWS.items():
         for di in range(7):
             col = FIRST_DAY_COL + di
-            cap = weekdays[si] if di <= 4 else weekends[si]
             names = list(grid[di][si]) if grid[di][si] else []
 
-            if cap == 1 and rows > 1:
-                # One slot in a taller block: merge the day's cells vertically
-                ws.merge_cells(start_row=top_row, start_column=col, end_row=bottom_row, end_column=col)
-                c = ws.cell(row=top_row, column=col, value=names[0] if names else None)
-                c.font = Font(name="Arial", bold=True, size=22)
-                c.alignment = CENTER
-            else:
-                for k in range(rows):
-                    c = ws.cell(row=top_row + k, column=col)
-                    if k < cap:
-                        c.value = names[k] if k < len(names) else None
-                        c.font = Font(name="Arial", bold=True, size=22)
-                        c.alignment = CENTER
-                    else:
-                        c.fill = BLACK
+            # Slots available for this day in the template: skip cells hidden
+            # inside a vertical merge (e.g. weekend 6am-9am is one tall cell).
+            slots = []
+            for r in rows:
+                cell = ws.cell(row=r, column=col)
+                rng = _merge_containing(ws, cell)
+                if rng and (r, col) != (rng.min_row, rng.min_col):
+                    continue
+                slots.append(cell)
 
-            for r in range(top_row, bottom_row + 1):
-                _border(ws.cell(row=r, column=col),
-                        left=thick if di == 0 else thin, right=thick if di == 6 else thin,
-                        top=thick if r == top_row else thin, bottom=thick if r == bottom_row else thin)
+            # More names than the template has room for: split the merge or
+            # reopen blacked-out cells so nothing is silently dropped.
+            if len(names) > len(slots):
+                for r in rows:
+                    cell = ws.cell(row=r, column=col)
+                    rng = _merge_containing(ws, cell)
+                    if rng:
+                        ws.unmerge_cells(str(rng))
+                slots = [ws.cell(row=r, column=col) for r in rows]
+                for cell in slots[:len(names)]:
+                    if _is_black(cell):
+                        cell.fill = copy(NO_FILL)
 
-        for r in range(top_row, bottom_row + 1):
-            ws.row_dimensions[r].height = 36
-        row = bottom_row + 1
+            for k, cell in enumerate(slots):
+                if k < len(names):
+                    if _is_black(cell):
+                        cell.fill = copy(NO_FILL)
+                    # last slot absorbs any overflow
+                    cell.value = " / ".join(names[k:]) if k == len(slots) - 1 else names[k]
+                elif not _is_black(cell):
+                    cell.value = None
 
-    ws.sheet_view.showGridLines = True
-    ws.freeze_panes = None
+def build_workbook(results: dict, settings: dict = None) -> bytes:
+    wb = load_workbook(TEMPLATE)
+    originals = list(wb.worksheets)
 
-def build_workbook(results: dict, settings: dict) -> bytes:
-    wb = Workbook()
-    wb.remove(wb.active)
+    def black_count(ws):
+        return sum(1 for r in range(5, 22) for c in range(FIRST_DAY_COL, FIRST_DAY_COL + 7)
+                   if _is_black(ws.cell(row=r, column=c)))
+    master = min(originals, key=black_count)
+    # Park the template sheets under names that cannot collide with a real week
+    for i, ws in enumerate(originals):
+        ws.title = f"__template{i}"
+
     for week in results["weeks"]:
-        ws = wb.create_sheet(title=_sheet_title(date.fromisoformat(week["week"])))
-        _write_week(ws, week["week"], week["schedule"], settings)
+        ws = wb.copy_worksheet(master)
+        ws.title = _sheet_name(date.fromisoformat(week["week"]))
+        # copy_worksheet keeps cell styles, merges and dimensions but not view/print settings
+        ws.sheet_view.showGridLines = master.sheet_view.showGridLines
+        ws.page_setup = copy(master.page_setup)
+        ws.page_margins = copy(master.page_margins)
+        ws.print_options = copy(master.print_options)
+        ws.sheet_properties.pageSetUpPr = copy(master.sheet_properties.pageSetUpPr)
+        _fill_week(ws, week["week"], week["schedule"])
+
+    for ws in originals:
+        wb.remove(ws)
     if not wb.sheetnames:
         wb.create_sheet(title="Empty")
+
     buf = BytesIO()
     wb.save(buf)
     return buf.getvalue()
