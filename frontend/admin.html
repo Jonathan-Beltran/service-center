@@ -295,7 +295,7 @@
 
 <div class="card">
   <h2>Schedule Preview</h2>
-  <div class="results-note">This is the empty schedule workers will fill in, built from the period and shift sizes on the Create Schedule tab. Click or drag to mark shifts as incentive pay. Each click cycles: incentive pay, double incentive pay, then off.</div>
+  <div class="results-note">This is the empty schedule workers will fill in, built from the period and shift sizes on the Create Schedule tab. Click or drag to mark shifts as incentive pay.</div>
   <div class="legend" id="preview-legend">
     <span><span class="slot"></span> Required slot</span>
     <span id="legend-yellow"><span class="slot yellow"></span> Yellow (optional extra) slot</span>
@@ -875,7 +875,7 @@
     if (!results || !results.run_at) { card.style.display = "none"; return; }
     card.style.display = "block";
 
-    document.getElementById("results-note").textContent = `Run ${fmtStamp(results.run_at)}. Only you can see this. Use Download Excel to share it.`;
+    document.getElementById("results-note").textContent = `Run ${fmtStamp(results.run_at)}. Use Download Excel to download the schedule.`;
 
     document.getElementById("result-grid").innerHTML = results.weeks.map(w => {
       const monday = parseISO(w.week);
