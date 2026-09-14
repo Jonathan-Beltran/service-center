@@ -657,7 +657,12 @@
     }
 
     document.getElementById("user-select").addEventListener("change", async function () {
-      currentUser = this.value;
+      const chosen = this.value;
+      if (chosen && !confirm(`Are you sure you are ${chosen}?`)) {
+        this.value = currentUser;   // revert to the previous choice
+        return;
+      }
+      currentUser = chosen;
       const week = document.getElementById("week");
       if (currentUser) {
         await loadExistingSelections(currentUser);
