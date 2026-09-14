@@ -839,6 +839,37 @@
     }
   }
 
+  async function downloadExcel() {
+    const btn = document.getElementById("xlsx-btn");
+    const statusEl = document.getElementById("run-status");
+    btn.disabled = true;
+    btn.textContent = "Preparing…";
+    try {
+      const res = await fetch("/results.xlsx", { headers: authHeaders() });
+      if (res.status === 401) { handleUnauthorized(); return; }
+      if (!res.ok) {
+        let detail = `Server error ${res.status}`;
+        try { detail = (await res.json()).detail || detail; } catch {}
+        showStatus(detail, "error", statusEl);
+        return;
+      }
+      const blob = await res.blob();
+      const match = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") || "");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = match ? match[1] : "schedule.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    } catch (err) {
+      showStatus(`Download failed: ${err.message}.`, "error", statusEl);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Download Excel";
+    }
+  }
+
   function renderResults() {
     const card = document.getElementById("results-card");
     if (!results || !results.run_at) { card.style.display = "none"; return; }
