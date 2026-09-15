@@ -231,7 +231,6 @@
     <h2>Scheduling Period</h2>
     <span class="save-state" id="save-state"></span>
   </div>
-  <div class="section-label">Every Monday-to-Sunday week in this range is included.</div>
   <div class="period-row">
     <div class="field-group">
       <label>Start (week of)</label>
@@ -248,10 +247,10 @@
 
 <div class="card">
   <h2>Shift Sizes</h2>
-  <div class="section-label">Number of people per shift. (Monday - Friday)</div>
+  <div class="section-label">Number of people per weekday shift. (Monday - Friday)</div>
   <div class="shift-grid" id="weekday-grid"></div>
   <hr class="divider">
-  <div class="section-label">Number of people per shift. (Saturday - Sunday)</div>
+  <div class="section-label">Number of people per weekend shift. (Saturday - Sunday)</div>
   <div class="shift-grid" id="weekend-grid"></div>
   <div class="yellows-row">
     <input type="checkbox" id="yellows" checked>
@@ -279,9 +278,9 @@
   </table>
   <hr class="divider">
   <div class="section-label">Bulk import</div>
-  <textarea id="bulk-input" rows="5" placeholder="Copy and paste from the Priority Points Rankings Spreadsheet (dont include commas)&#10;Example:&#10;HM        8516.38&#10;DH        5648.00&#10;AB        4265.71"></textarea>
+  <textarea id="bulk-input" rows="5" placeholder="Copy and paste the Priority Points Rankings Spreadsheet (dont include commas)&#10;Example:&#10;HM        8516.38&#10;DH        5648.00&#10;AB        4265.71"></textarea>
   <div style="display:flex;gap:10px;align-items:center;margin-top:8px;">
-    <button class="btn btn-primary" onclick="bulkAddWorkers()">Import</button>
+    <button class="btn btn-primary" onclick="bulkAddWorkers()">Add</button>
     <span id="bulk-status" style="font-size:0.82rem;color:#555;"></span>
   </div>
 </div>
@@ -295,12 +294,12 @@
 
 <div class="card">
   <h2>Schedule Preview</h2>
-  <div class="results-note">This is the empty schedule workers will fill in, built from the period and shift sizes on the Create Schedule tab. Click or drag to mark shifts as incentive pay.</div>
+  <div class="results-note">This is the preview of the schedule, built from the options you select from the Create Schedule tab. <b>Click or drag to mark shifts as incentive pay.</b></div>
   <div class="legend" id="preview-legend">
     <span><span class="slot"></span> Required slot</span>
     <span id="legend-yellow"><span class="slot yellow"></span> Yellow (optional extra) slot</span>
     <span><span class="swatch"></span> Incentive pay</span>
-    <span><span class="swatch double"></span> Double incentive pay</span>
+    <span><span class="swatch double"></span> Extra incentive pay</span>
   </div>
   <div id="preview-grid"></div>
 </div>
@@ -308,7 +307,7 @@
 <div class="action-row">
   <div class="tooltip-wrap">
     <button class="btn-run" id="create-btn" onclick="createSchedule()" title="This creates the schedule for everyone.">Create Schedule</button>
-    <span class="tooltip" role="tooltip">This creates the schedule for everyone.</span>
+    <span class="tooltip" role="tooltip">This creates the schedule, and releases it for everyone.</span>
   </div>
   <div class="action-info" id="create-info"></div>
 </div>
@@ -832,7 +831,7 @@
       results = data;
       renderResults();
       const failed = data.weeks.filter(w => w.error).length;
-      if (failed > 0) showStatus(`${failed} of ${data.weeks.length} weeks could not be fully filled. Details are listed under each week.`, "error", statusEl);
+      if (failed > 0) showStatus(`${failed} of ${data.weeks.length} weeks could not be fully filled.`, "error", statusEl);
       else showStatus(`All ${data.weeks.length} weeks filled. Review below, then post to workers.`, "success", statusEl);
       document.getElementById("results-card").scrollIntoView({ behavior: "smooth" });
     } catch (err) {
@@ -870,7 +869,7 @@
       showStatus(`Download failed: ${err.message}.`, "error", statusEl);
     } finally {
       btn.disabled = false;
-      btn.textContent = "Download Excel";
+      btn.textContent = "Download Schedule";
     }
   }
 
@@ -879,7 +878,7 @@
     if (!results || !results.run_at) { card.style.display = "none"; return; }
     card.style.display = "block";
 
-    document.getElementById("results-note").textContent = `Run ${fmtStamp(results.run_at)}. Use Download Excel to download the schedule.`;
+    document.getElementById("results-note").textContent = `Run ${fmtStamp(results.run_at)}. Press Download button to download the schedule.`;
 
     document.getElementById("result-grid").innerHTML = results.weeks.map(w => {
       const monday = parseISO(w.week);
