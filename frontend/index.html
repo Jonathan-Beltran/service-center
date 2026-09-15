@@ -184,6 +184,16 @@
     .clear-btn:hover { background: #ffe3e3; }
     .clear-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+    .page-footer {
+      margin-top: 40px;
+      padding-top: 16px;
+      border-top: 1px solid #e0e0e0;
+      font-size: 0.85rem;
+      color: #666;
+      text-align: center;
+    }
+    .page-footer a { color: #3b5bdb; font-weight: 600; }
+
     .submit-status {
       font-size: 0.82rem;
       padding: 3px 10px;
@@ -260,7 +270,7 @@
     <a href="/admin.html" class="admin-link">Supervisor Panel</a>
   </header>
 
-  <p class="hint" style="margin:0 0 12px">Pick a week, then click shifts in order of preference.</p>
+  <p class="hint" style="margin:0 0 12px">Pick a week, then click shifts <b>in order of preference.</b></p>
   <div class="week-tabs" id="week-tabs"></div>
   <div class="notice" id="notice" style="display:none"></div>
 
@@ -274,6 +284,10 @@
     <button class="clear-btn" id="clear-btn" onclick="clearWeek()">Clear this week</button>
     <span class="submit-status" id="submit-status" style="display:none"></span>
   </div>
+
+  <footer class="page-footer">
+    Leave feedback here! <a href="https://forms.gle/RfRUr69bwy2Thkkm6" target="_blank" rel="noopener">Google Form</a>
+  </footer>
 
   <script>
     const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -546,7 +560,7 @@
 
       if (weeks.length === 0) {
         notice.textContent = pub
-          ? "The supervisors have not released the schedule yet. Check back later."
+          ? "Supervisors have not released the schedule yet. Refresh or check back later."
           : "Could not reach the server. Try again in a moment.";
         notice.style.display = "block";
         picker.style.display = "none";
