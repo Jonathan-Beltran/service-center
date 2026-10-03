@@ -279,7 +279,7 @@
 </div>
 
 <div class="card">
-  <h2>Shift Sizes</h2>
+  <h2>Set Shift Sizes</h2>
   <div class="section-label">Number of people per weekday shift. (Monday - Friday)</div>
   <div class="shift-grid" id="weekday-grid"></div>
   <hr class="divider">
@@ -293,7 +293,7 @@
 
 <div class="card">
   <div class="card-head">
-    <h2>Workers</h2>
+    <h2>Add Workers</h2>
     <button class="btn btn-danger sm" onclick="clearWorkers()">Clear All Workers</button>
   </div>
   <table>
@@ -310,8 +310,8 @@
     </tbody>
   </table>
   <hr class="divider">
-  <div class="section-label">Bulk import</div>
-  <textarea id="bulk-input" rows="5" placeholder="Copy and paste the Priority Points Rankings Spreadsheet (dont include commas)&#10;Example:&#10;HM        8516.38&#10;DH        5648.00&#10;AB        4265.71"></textarea>
+  <div class="section-label">Who is working for this period?</div>
+  <textarea id="bulk-input" rows="5" placeholder="Copy and paste the Priority Points Rankings Spreadsheet &#10;Example:&#10;HM        8516.38&#10;DH        5648.00&#10;AB        4265.71"></textarea>
   <div style="display:flex;gap:10px;align-items:center;margin-top:8px;">
     <button class="btn btn-primary" onclick="bulkAddWorkers()">Add</button>
     <span id="bulk-status" style="font-size:0.82rem;color:#555;"></span>
@@ -352,9 +352,9 @@
 <div class="modal-overlay" id="day-modal" hidden>
   <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="day-modal-title">
     <h2 id="day-modal-title"></h2>
-    <div class="modal-sub">These shift sizes apply to this one day only. Every other day keeps the sizes from the Create Schedule tab.</div>
+    <div class="modal-sub">Only applies to this day only.</div>
     <div class="field-group">
-      <label for="day-note">Note (optional, shown on the schedule and in the Excel notes row)</label>
+      <label for="day-note">Note (optional)</label>
       <input type="text" id="day-note" maxlength="60" placeholder="e.g. Thanksgiving">
     </div>
     <div class="section-label">Number of people per shift</div>
