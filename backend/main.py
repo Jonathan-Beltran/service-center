@@ -70,6 +70,7 @@ def admin_login(body: LoginRequest):
 #   "draft":          setup being edited on the Create Schedule tab (supervisor only)
 #   "published":      setup workers see, plus "created_at"; None until Create Schedule
 #   "preferences":    {"HM": {"2026-09-21": [[day, shift], ...], ...}, ...}
+#   "unavailable":    same shape; shifts a worker cannot work, never autofilled onto them
 #   "results":        last run of the algorithm, supervisor only: {"run_at", "weeks": [...]}
 # }
 
@@ -88,6 +89,7 @@ def _empty_store() -> dict:
         "draft": _empty_setup(),
         "published": None,
         "preferences": {},
+        "unavailable": {},
         "results": None,
     }
 
@@ -247,12 +249,13 @@ def publish():
     with store_lock:
         store["published"] = published
         # Drop submissions and results for weeks that are no longer in the period
-        for initials in list(store["preferences"]):
-            by_week = {w: t for w, t in store["preferences"][initials].items() if w in keep}
-            if by_week:
-                store["preferences"][initials] = by_week
-            else:
-                del store["preferences"][initials]
+        for key in ("preferences", "unavailable"):
+            for initials in list(store[key]):
+                by_week = {w: t for w, t in store[key][initials].items() if w in keep}
+                if by_week:
+                    store[key][initials] = by_week
+                else:
+                    del store[key][initials]
         if store["results"]:
             store["results"]["weeks"] = [r for r in store["results"]["weeks"] if r["week"] in keep]
         save_store()
@@ -270,7 +273,26 @@ def get_published():
 
 class PreferenceSubmission(BaseModel):
     initials: str
-    weeks: Dict[str, List[List[int]]]   # ISO Monday -> ordered [[day, shift], ...]
+    weeks: Dict[str, List[List[int]]]                 # ISO Monday -> ordered [[day, shift], ...]
+    unavailable: Dict[str, List[List[int]]] = {}      # ISO Monday -> [[day, shift], ...] they cannot work
+
+def _clean_shift_lists(by_week: Dict[str, List[List[int]]], open_weeks: set) -> Dict[str, List[List[int]]]:
+    cleaned: Dict[str, List[List[int]]] = {}
+    for week, times in by_week.items():
+        if week not in open_weeks:
+            raise HTTPException(status_code=400, detail=f"Week {week} is not open for scheduling")
+        for t in times:
+            if len(t) != 2 or not (0 <= t[0] <= 6) or not (0 <= t[1] <= 7):
+                raise HTTPException(status_code=400, detail=f"Invalid shift selection {t}")
+        if times:
+            cleaned[week] = [[int(t[0]), int(t[1])] for t in times]
+    return cleaned
+
+def _set_or_drop(bucket: dict, initials: str, by_week: dict):
+    if by_week:
+        bucket[initials] = by_week
+    else:
+        bucket.pop(initials, None)
 
 @app.post("/submit_preference")
 def submit_preference(pref: PreferenceSubmission):
@@ -285,40 +307,39 @@ def submit_preference(pref: PreferenceSubmission):
         raise HTTPException(status_code=400, detail=f"{initials} is not on the worker list")
 
     open_weeks = set(pub["weeks"])
-    cleaned: Dict[str, List[List[int]]] = {}
-    for week, times in pref.weeks.items():
-        if week not in open_weeks:
-            raise HTTPException(status_code=400, detail=f"Week {week} is not open for scheduling")
-        for t in times:
-            if len(t) != 2 or not (0 <= t[0] <= 6) or not (0 <= t[1] <= 7):
-                raise HTTPException(status_code=400, detail=f"Invalid shift selection {t}")
-        if times:
-            cleaned[week] = [[int(t[0]), int(t[1])] for t in times]
+    cleaned = _clean_shift_lists(pref.weeks, open_weeks)
+    blocked = _clean_shift_lists(pref.unavailable, open_weeks)
+    # A shift cannot be both picked and blocked; the pick wins
+    for week in list(blocked):
+        picked = cleaned.get(week, [])
+        blocked[week] = [t for t in blocked[week] if t not in picked]
+        if not blocked[week]:
+            del blocked[week]
 
     with store_lock:
-        if cleaned:
-            store["preferences"][initials] = cleaned
-        else:
-            store["preferences"].pop(initials, None)
+        _set_or_drop(store["preferences"], initials, cleaned)
+        _set_or_drop(store["unavailable"], initials, blocked)
         save_store()
     return {"status": "ok"}
 
 @app.get("/preferences/{initials}")
 def get_preference(initials: str):
     key = initials.strip().upper()
-    return {"initials": key, "weeks": store["preferences"].get(key, {})}
+    return {"initials": key, "weeks": store["preferences"].get(key, {}), "unavailable": store["unavailable"].get(key, {})}
 
 @app.get("/preferences", dependencies=[Depends(require_auth)])
 def get_preferences():
-    return [{"initials": k, "weeks": v} for k, v in store["preferences"].items()]
+    keys = list(store["preferences"]) + [k for k in store["unavailable"] if k not in store["preferences"]]
+    return [{"initials": k, "weeks": store["preferences"].get(k, {}), "unavailable": store["unavailable"].get(k, {})} for k in keys]
 
 @app.delete("/preferences/{initials}", dependencies=[Depends(require_auth)])
 def delete_preference(initials: str):
     key = initials.strip().upper()
     with store_lock:
-        if key not in store["preferences"]:
+        if key not in store["preferences"] and key not in store["unavailable"]:
             raise HTTPException(status_code=404, detail="Not found")
-        del store["preferences"][key]
+        store["preferences"].pop(key, None)
+        store["unavailable"].pop(key, None)
         save_store()
     return {"status": "ok"}
 
@@ -326,6 +347,7 @@ def delete_preference(initials: str):
 def clear_preferences():
     with store_lock:
         store["preferences"] = {}
+        store["unavailable"] = {}
         save_store()
     return {"status": "ok"}
 
@@ -357,6 +379,7 @@ def run_schedule():
             "selected_times": [e[1] for e in entries],
             "doubles": [e[0] in doubles_recipients for e in entries],
             "all_workers": [(w["initials"], w["points"]) for w in pub["workers"]],
+            "unavailable": {i: by_week[week] for i, by_week in store["unavailable"].items() if by_week.get(week)},
         }
         # schedule() mutates its inputs, so hand it fresh copies per week
         days = {

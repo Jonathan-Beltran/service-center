@@ -131,11 +131,13 @@ def schedule(data, days):
     # ── Autofill (optional) ──────────────────────────────────────────────────
     # Seats nobody picked are forced onto workers: fewest shifts this week
     # first, then lowest priority points. Every worker on the list is eligible,
-    # including those who did not submit picks for this week.
+    # including those who did not submit picks for this week, except for
+    # shifts they marked as unable to work (data["unavailable"]).
 
     forced = []   # [[day, shift, name], ...]
     if days.get("autofill") and num_required_shifts > 0:
         pool = data.get("all_workers") or [(user[0], user[1]) for user in users]
+        blocked = {(name, d, s) for name, cells in (data.get("unavailable") or {}).items() for d, s in cells}
 
         def shift_count(name):
             # 12am-6am is one grave shift, so 3am-6am is not counted separately
@@ -148,6 +150,7 @@ def schedule(data, days):
                 while len(schedule_grid[day_i][shift_i]) < required(day_i, shift_i):
                     candidates = [w for w in pool
                                   if w[0] not in schedule_grid[day_i][shift_i]
+                                  and (w[0], day_i, shift_i) not in blocked
                                   and not (shift_i == 0 and w[0] in schedule_grid[day_i][1])]
                     if not candidates:
                         break

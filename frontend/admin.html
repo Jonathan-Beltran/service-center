@@ -115,6 +115,7 @@
     .pref-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f8f9fa; border-radius: 6px; margin-bottom: 6px; font-size: 0.85rem; flex-wrap: wrap; gap: 6px; }
     .pref-item .initials { font-weight: 700; margin-right: 8px; }
     .pref-item .count { color: #777; }
+    .pref-item .cant-work { color: #c92a2a; font-size: 0.78rem; margin-left: 10px; }
     .pref-weeks { display: flex; flex-wrap: wrap; gap: 4px; }
     .week-chip { font-size: 0.72rem; border-radius: 4px; padding: 2px 7px; background: #d3f9d8; color: #2b8a3e; white-space: nowrap; }
     .week-chip.missing { background: #f1f3f5; color: #aaa; }
@@ -926,8 +927,10 @@
           : `<span class="week-chip missing" title="Week of ${weekLabel(w)}">${label}: —</span>`;
       }).join("");
       const done = weeks.filter(w => (p.weeks[w] || []).length > 0).length;
+      const cantWork = weeks.reduce((n, w) => n + ((p.unavailable || {})[w] || []).length, 0);
+      const cantWorkNote = cantWork > 0 ? `<span class="cant-work" title="Shifts marked as can't work; never autofilled onto them">✕ ${cantWork} can't work</span>` : "";
       return `<div class="pref-item">
-        <span><span class="initials">${p.initials}</span><span class="count">${done}/${weeks.length} weeks</span></span>
+        <span><span class="initials">${p.initials}</span><span class="count">${done}/${weeks.length} weeks</span>${cantWorkNote}</span>
         <span class="pref-weeks">${chips}</span>
         <button class="btn btn-danger sm" onclick="removePref('${p.initials}')">Remove</button>
       </div>`;
@@ -942,7 +945,7 @@
       if (res.status === 401) { handleUnauthorized(); return; }
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
-      preferences = data.map(p => ({ initials: p.initials, weeks: p.weeks || {} }));
+      preferences = data.map(p => ({ initials: p.initials, weeks: p.weeks || {}, unavailable: p.unavailable || {} }));
       renderPreferences();
     } catch (err) {
       document.getElementById("pref-list").innerHTML = `<p class="empty-msg">Could not load submissions: ${err.message}</p>`;
