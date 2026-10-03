@@ -93,8 +93,9 @@ def _day_setup(published: dict, week_iso: str, di: int):
     caps = settings.get("weekdays" if di <= 4 else "weekends") or []
     return caps, bool(settings.get("yellows")) and di <= 4, None
 
-def _fill_week(ws, week_iso: str, grid, published: dict):
+def _fill_week(ws, week_iso: str, grid, published: dict, forced=()):
     monday = date.fromisoformat(week_iso)
+    forced = {(d, s, n) for d, s, n in forced}
     ws["A1"].value = _title(monday)
 
     for i in range(7):
@@ -105,7 +106,8 @@ def _fill_week(ws, week_iso: str, grid, published: dict):
     for si, rows in SHIFT_ROWS.items():
         for di in range(7):
             col = FIRST_DAY_COL + di
-            names = list(grid[di][si]) if grid[di][si] else []
+            # Autofilled (forced) seats are shown as [JB]
+            names = [f"[{n}]" if (di, si, n) in forced else n for n in (grid[di][si] or [])]
 
             # Slots available for this day in the template: skip cells hidden
             # inside a vertical merge (e.g. weekend 6am-9am is one tall cell).
@@ -173,7 +175,7 @@ def build_workbook(results: dict, published: dict = None) -> bytes:
         ws.page_margins = copy(master.page_margins)
         ws.print_options = copy(master.print_options)
         ws.sheet_properties.pageSetUpPr = copy(master.sheet_properties.pageSetUpPr)
-        _fill_week(ws, week["week"], week["schedule"], published)
+        _fill_week(ws, week["week"], week["schedule"], published, week.get("forced", []))
 
     for ws in originals:
         wb.remove(ws)

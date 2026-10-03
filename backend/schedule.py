@@ -116,20 +116,64 @@ def schedule(data, days):
                     num_required_shifts += 1  # add the matching 3am-6am requirement
 
         if num_required_shifts == start:
-            day_names   = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
-            shift_names = ["12am–3am","3am–6am","6am–9am","9am–12pm","12pm–3pm","3pm–6pm","6pm–9pm","9pm–12am"]
-            unfilled = []
-            for day_i in range(7):
-                for shift_i in range(8):
-                    if shift_i == 1:
-                        continue
-                    short = required(day_i, shift_i) - len(schedule_grid[day_i][shift_i])
-                    for _ in range(short):
-                        unfilled.append(f"{day_names[day_i]} {shift_names[shift_i]}")
-            for username, grave_days in pending_graves.items():
-                for grave_day in grave_days:
-                    unfilled.append(f"{day_names[grave_day]} {shift_names[1]} (owed by {username})")
-            return {"error": True, "unfilled": unfilled, "schedule": schedule_grid}
+            break   # nobody's picks can fill what is left
+
+    # A 12am-3am taken in the final pass leaves its 3am-6am owed (the pass
+    # nets zero progress, so the loop stops before resolving it). Give it to
+    # the worker who started the grave.
+    for username, grave_days in pending_graves.items():
+        for grave_day in list(grave_days):
+            if len(schedule_grid[grave_day][1]) < caps_by_day[grave_day][1]:
+                schedule_grid[grave_day][1].append(username)
+                num_required_shifts -= 1
+                grave_days.remove(grave_day)
+
+    # ── Autofill (optional) ──────────────────────────────────────────────────
+    # Seats nobody picked are forced onto workers: fewest shifts this week
+    # first, then lowest priority points. Every worker on the list is eligible,
+    # including those who did not submit picks for this week.
+
+    forced = []   # [[day, shift, name], ...]
+    if days.get("autofill") and num_required_shifts > 0:
+        pool = data.get("all_workers") or [(user[0], user[1]) for user in users]
+
+        def shift_count(name):
+            # 12am-6am is one grave shift, so 3am-6am is not counted separately
+            return sum(name in schedule_grid[d][s] for d in range(7) for s in range(8) if s != 1)
+
+        for day_i in range(7):
+            for shift_i in range(8):
+                if shift_i == 1:
+                    continue   # filled together with 12am-3am below
+                while len(schedule_grid[day_i][shift_i]) < required(day_i, shift_i):
+                    candidates = [w for w in pool
+                                  if w[0] not in schedule_grid[day_i][shift_i]
+                                  and not (shift_i == 0 and w[0] in schedule_grid[day_i][1])]
+                    if not candidates:
+                        break
+                    name = min(candidates, key=lambda w: (shift_count(w[0]), w[1]))[0]
+                    schedule_grid[day_i][shift_i].append(name)
+                    forced.append([day_i, shift_i, name])
+                    # A forced grave carries its 3am-6am half with it
+                    if shift_i == 0 and len(schedule_grid[day_i][1]) < caps_by_day[day_i][1]:
+                        schedule_grid[day_i][1].append(name)
+                        forced.append([day_i, 1, name])
+
+    day_names   = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+    shift_names = ["12am–3am","3am–6am","6am–9am","9am–12pm","12pm–3pm","3pm–6pm","6pm–9pm","9pm–12am"]
+    unfilled = []
+    for day_i in range(7):
+        for shift_i in range(8):
+            if shift_i == 1:
+                continue
+            short = required(day_i, shift_i) - len(schedule_grid[day_i][shift_i])
+            for _ in range(short):
+                unfilled.append(f"{day_names[day_i]} {shift_names[shift_i]}")
+    for username, grave_days in pending_graves.items():
+        for grave_day in grave_days:
+            unfilled.append(f"{day_names[grave_day]} {shift_names[1]} (owed by {username})")
+    if unfilled:
+        return {"error": True, "unfilled": unfilled, "schedule": schedule_grid, "forced": forced}
 
     # ── Yellow slots (optional extra seats) ──────────────────────────────────
     # Use original_prefs so preferences popped during the main loop aren't lost.
@@ -148,4 +192,4 @@ def schedule(data, days):
                 if wanted and username not in schedule_grid[day_i][shift_i]:
                     schedule_grid[day_i][shift_i].append(username)
 
-    return schedule_grid
+    return {"error": False, "unfilled": [], "schedule": schedule_grid, "forced": forced}

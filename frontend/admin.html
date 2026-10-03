@@ -199,6 +199,7 @@
     .result-table td.shift-label.yellow { background: #fffbe6; }
     .chips { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
     .chip { background: #3b5bdb; color: white; border-radius: 4px; padding: 2px 7px; font-size: 0.72rem; }
+    .chip.forced { background: #fff; color: #3b5bdb; border: 1px dashed #3b5bdb; padding: 1px 6px; }
     .empty-slot { color: #ccc; }
     /* Empty slots in the preview */
     .slot { display: inline-block; width: 28px; height: 18px; border: 1.5px dashed #b8c4f0; border-radius: 4px; background: #f8f9ff; }
@@ -289,6 +290,11 @@
     <input type="checkbox" id="yellows" checked>
     <label for="yellows">Yellows?</label>
   </div>
+  <div class="yellows-row">
+    <input type="checkbox" id="autofill" checked>
+    <label for="autofill">Autofill Empty Shifts</label>
+  </div>
+  <div class="help-text" style="margin-top:4px">When checked, shifts nobody picked are assigned to the workers with the fewest shifts that week, lowest priority points first. They show as [JB] in the Excel sheet.</div>
 </div>
 
 <div class="card">
@@ -529,7 +535,8 @@
       settings: {
         weekdays: getCapacities("weekday-grid"),
         weekends: getCapacities("weekend-grid"),
-        yellows: document.getElementById("yellows").checked
+        yellows: document.getElementById("yellows").checked,
+        autofill: document.getElementById("autofill").checked
       },
       workers: draft.workers,
       incentives: draft.incentives || {},
@@ -544,6 +551,7 @@
     buildGrid("weekday-grid", s.weekdays);
     buildGrid("weekend-grid", s.weekends);
     document.getElementById("yellows").checked = !!s.yellows;
+    document.getElementById("autofill").checked = s.autofill !== false;
     updateYellowHighlight();
     renderWeeks();
     renderWorkers();
@@ -611,6 +619,7 @@
   document.getElementById("weekday-grid").addEventListener("input", scheduleDraftSave);
   document.getElementById("weekend-grid").addEventListener("input", scheduleDraftSave);
   document.getElementById("yellows").addEventListener("change", () => { updateYellowHighlight(); scheduleDraftSave(); });
+  document.getElementById("autofill").addEventListener("change", scheduleDraftSave);
 
   // ── Workers (part of the draft) ───────────────────────────────────────────
 
@@ -979,8 +988,10 @@
       results = data;
       renderResults();
       const failed = data.weeks.filter(w => w.error).length;
-      if (failed > 0) showStatus(`${failed} of ${data.weeks.length} weeks could not be fully filled.`, "error", statusEl);
-      else showStatus(`All ${data.weeks.length} weeks filled. Review below, then post to workers.`, "success", statusEl);
+      const forced = data.weeks.reduce((n, w) => n + (w.forced || []).filter(f => f[1] !== 1).length, 0);
+      const forcedMsg = forced > 0 ? ` ${forced} shift${forced !== 1 ? "s were" : " was"} autofilled, shown in [brackets].` : "";
+      if (failed > 0) showStatus(`${failed} of ${data.weeks.length} weeks could not be fully filled.${forcedMsg}`, "error", statusEl);
+      else showStatus(`All ${data.weeks.length} weeks filled.${forcedMsg} Review below, then download the Excel.`, "success", statusEl);
       document.getElementById("results-card").scrollIntoView({ behavior: "smooth" });
     } catch (err) {
       showStatus(`Request failed: ${err.message}.`, "error", statusEl);
@@ -1039,10 +1050,11 @@
         html += `<tr><td class="shift-label${isYellow ? " yellow" : ""}">${label}</td>`;
         DAY_LABELS.forEach((_, di) => {
           const assigned = w.schedule[di]?.[si] ?? [];
+          const isForced = n => (w.forced || []).some(f => f[0] === di && f[1] === si && f[2] === n);
           const lvl = incentiveLevel(published, w.week, di, si);
           const cls = lvl ? ` class="${incentiveClass(lvl).trim()}"` : "";
           html += assigned.length > 0
-            ? `<td${cls}><div class="chips">${assigned.map(n => `<span class="chip">${n}</span>`).join("")}</div></td>`
+            ? `<td${cls}><div class="chips">${assigned.map(n => isForced(n) ? `<span class="chip forced" title="Autofilled">[${n}]</span>` : `<span class="chip">${n}</span>`).join("")}</div></td>`
             : `<td${cls}><span class="empty-slot">—</span></td>`;
         });
         html += "</tr>";

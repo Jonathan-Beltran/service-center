@@ -60,7 +60,7 @@ def admin_login(body: LoginRequest):
 # A "schedule setup" is {start, end, weeks, settings, workers}:
 #   start/end  ISO dates chosen by the supervisor
 #   weeks      ISO date of every Monday in that range (computed)
-#   settings   {"weekdays": [8 ints], "weekends": [8 ints], "yellows": bool}
+#   settings   {"weekdays": [8 ints], "weekends": [8 ints], "yellows": bool, "autofill": bool}
 #   workers    [{"initials", "points", "doubles"}, ...]
 #   incentives {"2026-09-21": [[day, shift, level], ...]}   level 1 = incentive pay, 2 = double incentive
 #   overrides  {"2026-09-21": {"0": {"caps": [8 ints], "yellows": bool, "note": str}}}
@@ -77,6 +77,7 @@ DEFAULT_SETTINGS = {
     "weekdays": [1, 1, 2, 3, 3, 3, 2, 2],
     "weekends": [1, 1, 1, 2, 2, 2, 2, 2],
     "yellows": True,
+    "autofill": True,
 }
 
 def _empty_setup() -> dict:
@@ -121,6 +122,7 @@ class Settings(BaseModel):
     weekdays: List[int]
     weekends: List[int]
     yellows: bool
+    autofill: bool = True   # force unpicked seats onto workers
 
 class WorkerEntry(BaseModel):
     initials: str
@@ -354,20 +356,19 @@ def run_schedule():
             "priority_points": [priority_by_initials.get(e[0], 0) for e in entries],
             "selected_times": [e[1] for e in entries],
             "doubles": [e[0] in doubles_recipients for e in entries],
+            "all_workers": [(w["initials"], w["points"]) for w in pub["workers"]],
         }
         # schedule() mutates its inputs, so hand it fresh copies per week
         days = {
             "weekdays": list(settings["weekdays"]),
             "weekends": list(settings["weekends"]),
             "yellows": settings["yellows"],
+            "autofill": settings.get("autofill", True),
             "overrides": {int(d): o for d, o in pub.get("overrides", {}).get(week, {}).items()},
         }
 
         out = schedule(data, days)
-        if isinstance(out, dict):
-            results.append({"week": week, "error": True, "unfilled": out["unfilled"], "schedule": out["schedule"]})
-        else:
-            results.append({"week": week, "error": False, "unfilled": [], "schedule": out})
+        results.append({"week": week, **out})
 
     run = {"run_at": _now(), "yellows": settings["yellows"], "weeks": results}
     with store_lock:

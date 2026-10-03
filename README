@@ -15,6 +15,10 @@ How scheduling works
   1. Create Schedule: set the period (start and end dates), shift sizes, and
      import workers. This is a draft. It saves as you type, but workers see
      none of it.
+     "Autofill Empty Shifts" (on by default): when workers' picks leave
+     required seats empty, each one goes to the worker with the fewest shifts
+     that week, lowest priority points breaking ties. Forced seats show as
+     [JB] on the results and in the Excel export.
   2. Preview Schedule: shows the empty schedule built from the draft. Click a
      cell to mark that shift as incentive pay (green); workers see the same
      green marking when picking shifts and on the posted schedule. Click a
