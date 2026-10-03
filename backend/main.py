@@ -63,6 +63,8 @@ def admin_login(body: LoginRequest):
 #   settings   {"weekdays": [8 ints], "weekends": [8 ints], "yellows": bool}
 #   workers    [{"initials", "points", "doubles"}, ...]
 #   incentives {"2026-09-21": [[day, shift, level], ...]}   level 1 = incentive pay, 2 = double incentive
+#   overrides  {"2026-09-21": {"0": {"caps": [8 ints], "yellows": bool, "note": str}}}
+#              per-day shift sizes that replace settings for that one day (holidays etc.)
 #
 # store = {
 #   "draft":          setup being edited on the Create Schedule tab (supervisor only)
@@ -78,7 +80,7 @@ DEFAULT_SETTINGS = {
 }
 
 def _empty_setup() -> dict:
-    return {"start": None, "end": None, "weeks": [], "settings": deepcopy(DEFAULT_SETTINGS), "workers": [], "incentives": {}}
+    return {"start": None, "end": None, "weeks": [], "settings": deepcopy(DEFAULT_SETTINGS), "workers": [], "incentives": {}, "overrides": {}}
 
 def _empty_store() -> dict:
     return {
@@ -125,12 +127,18 @@ class WorkerEntry(BaseModel):
     points: float
     doubles: bool
 
+class DayOverride(BaseModel):
+    caps: List[int]
+    yellows: bool
+    note: str = ""
+
 class SetupRequest(BaseModel):
     start: Optional[date] = None
     end: Optional[date] = None
     settings: Settings
     workers: List[WorkerEntry]
     incentives: Dict[str, List[List[int]]] = {}
+    overrides: Dict[str, Dict[str, DayOverride]] = {}
 
 def _monday_of(d: date) -> date:
     return d - timedelta(days=d.weekday())
@@ -178,6 +186,22 @@ def _build_setup(body: SetupRequest) -> dict:
         if cleaned:
             incentives[week] = cleaned
 
+    overrides: Dict[str, Dict[str, dict]] = {}
+    for week, by_day in body.overrides.items():
+        if week not in weeks:
+            continue
+        cleaned_days = {}
+        for day, o in by_day.items():
+            if day not in {str(i) for i in range(7)}:
+                raise HTTPException(status_code=400, detail=f"Invalid override day {day}")
+            if len(o.caps) != 8 or any(c < 0 or c > 20 for c in o.caps):
+                raise HTTPException(status_code=400, detail="Day override needs 8 shift sizes between 0 and 20")
+            caps = [int(c) for c in o.caps]
+            caps[1] = caps[0]   # 3am-6am mirrors 12am-3am
+            cleaned_days[day] = {"caps": caps, "yellows": o.yellows, "note": o.note.strip()[:60]}
+        if cleaned_days:
+            overrides[week] = cleaned_days
+
     return {
         "start": body.start.isoformat() if body.start else None,
         "end": body.end.isoformat() if body.end else None,
@@ -185,6 +209,7 @@ def _build_setup(body: SetupRequest) -> dict:
         "settings": body.settings.model_dump(),
         "workers": workers,
         "incentives": incentives,
+        "overrides": overrides,
     }
 
 # ── Draft (supervisor only) ───────────────────────────────────────────────────
@@ -335,6 +360,7 @@ def run_schedule():
             "weekdays": list(settings["weekdays"]),
             "weekends": list(settings["weekends"]),
             "yellows": settings["yellows"],
+            "overrides": {int(d): o for d, o in pub.get("overrides", {}).get(week, {}).items()},
         }
 
         out = schedule(data, days)

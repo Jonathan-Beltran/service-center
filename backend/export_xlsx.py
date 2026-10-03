@@ -12,7 +12,7 @@ the template untouched.
 Template geometry (rows on the sheet):
   1      title, merged A1:I1
   2      dates, B..H
-  3      notes (holidays etc.), cleared on export
+  3      notes (holidays etc.), filled from the day overrides' notes
   4      day names
   5..21  shift blocks, see SHIFT_ROWS
 Column A and I carry the shift labels; B..H are Monday..Sunday.
@@ -84,17 +84,23 @@ def _incentive_level(published: dict, week_iso: str, di: int, si: int) -> int:
             return c[2] if len(c) > 2 else 1
     return 0
 
+def _day_setup(published: dict, week_iso: str, di: int):
+    """(caps, yellows, note) for one day: its override if it has one, else the defaults."""
+    o = (published or {}).get("overrides", {}).get(week_iso, {}).get(str(di))
+    if o:
+        return o["caps"], bool(o["yellows"]), o.get("note") or None
+    settings = (published or {}).get("settings") or {}
+    caps = settings.get("weekdays" if di <= 4 else "weekends") or []
+    return caps, bool(settings.get("yellows")) and di <= 4, None
+
 def _fill_week(ws, week_iso: str, grid, published: dict):
     monday = date.fromisoformat(week_iso)
-    settings = (published or {}).get("settings") or {}
-    yellows = bool(settings.get("yellows"))
-    weekday_caps = settings.get("weekdays") or []
     ws["A1"].value = _title(monday)
 
     for i in range(7):
         col = FIRST_DAY_COL + i
         ws.cell(row=DATE_ROW, column=col).value = _short(monday + timedelta(days=i))
-        ws.cell(row=NOTES_ROW, column=col).value = None   # holiday notes are week-specific
+        ws.cell(row=NOTES_ROW, column=col).value = _day_setup(published, week_iso, i)[2]
 
     for si, rows in SHIFT_ROWS.items():
         for di in range(7):
@@ -125,9 +131,10 @@ def _fill_week(ws, week_iso: str, grid, published: dict):
                         cell.fill = copy(NO_FILL)
 
             level = _incentive_level(published, week_iso, di, si)
+            caps, yellows, _ = _day_setup(published, week_iso, di)
             yellow_slot = -1
-            if yellows and di <= 4 and si in YELLOW_SHIFTS and si < len(weekday_caps) and weekday_caps[si] > 0:
-                yellow_slot = weekday_caps[si] - 1      # the optional extra seat is the last one
+            if yellows and si in YELLOW_SHIFTS and si < len(caps) and caps[si] > 0:
+                yellow_slot = caps[si] - 1      # the optional extra seat is the last one
 
             for k, cell in enumerate(slots):
                 if k < len(names):

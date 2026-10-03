@@ -12,9 +12,32 @@ def schedule(data, days):
 
     users.sort(key=lambda x: x[1], reverse=True)
 
-    # 3am-6am (shift 1) always mirrors 12am-3am (shift 0)
-    days["weekdays"][1] = days["weekdays"][0]
-    days["weekends"][1] = days["weekends"][0]
+    # Per-day capacities and yellows. Weekdays/weekends are the defaults;
+    # days["overrides"] = {day_index: {"caps": [8 ints], "yellows": bool}}
+    # replaces them for individual days (holidays etc.).
+    overrides = days.get("overrides") or {}
+    caps_by_day = []
+    yellow_by_day = []
+    for day_index in range(7):
+        o = overrides.get(day_index) or overrides.get(str(day_index))
+        if o:
+            caps = list(o["caps"])
+            yellow = bool(o["yellows"])
+        else:
+            caps = list(days["weekdays"] if day_index <= 4 else days["weekends"])
+            yellow = bool(days["yellows"]) and day_index <= 4
+        # 3am-6am (shift 1) always mirrors 12am-3am (shift 0)
+        caps[1] = caps[0]
+        caps_by_day.append(caps)
+        yellow_by_day.append(yellow)
+
+    def is_yellow(day, time):
+        return yellow_by_day[day] and time in (3, 4, 5) and caps_by_day[day][time] > 0
+
+    def required(day, time):
+        """Seats that must be filled; the yellow seat is optional."""
+        cap = caps_by_day[day][time]
+        return cap - 1 if is_yellow(day, time) else cap
 
     # 7 days x 8 shifts
     schedule_grid = [[[] for _ in range(8)] for _ in range(7)]
@@ -23,16 +46,13 @@ def schedule(data, days):
     num_yellow_shifts = 0
 
     for day_index in range(7):
-        caps = days["weekdays"] if day_index <= 4 else days["weekends"]
-        for shift_index, cap in enumerate(caps):
+        for shift_index in range(8):
             if shift_index == 1:
                 # 3am-6am is filled via pending graves, not counted upfront
                 continue
-            if days["yellows"] and day_index <= 4 and shift_index in (3, 4, 5):
-                num_required_shifts += cap - 1
+            num_required_shifts += required(day_index, shift_index)
+            if is_yellow(day_index, shift_index):
                 num_yellow_shifts += 1
-            else:
-                num_required_shifts += cap
 
     # Snapshot preferences before the main loop mutates the deques
     original_prefs = {user[0]: list(user[2]) for user in users}
@@ -60,8 +80,7 @@ def schedule(data, days):
                 if picks_left <= 0:
                     pending_graves[username].append(grave_day)
                     continue
-                cap = days["weekdays"][1] if grave_day <= 4 else days["weekends"][1]
-                if len(schedule_grid[grave_day][1]) < cap:
+                if len(schedule_grid[grave_day][1]) < caps_by_day[grave_day][1]:
                     schedule_grid[grave_day][1].append(username)
                     num_required_shifts -= 1
                 picks_left -= 1
@@ -72,14 +91,7 @@ def schedule(data, days):
                     break
 
                 day, time = sel_times[0]
-
-                if day <= 4:
-                    if not days["yellows"]:
-                        limit = days["weekdays"][time]
-                    else:
-                        limit = days["weekdays"][time] - 1 if time in (3, 4, 5) else days["weekdays"][time]
-                else:
-                    limit = days["weekends"][time]
+                limit = required(day, time)
 
                 # Advance past full slots
                 out_of_selections = False
@@ -89,13 +101,7 @@ def schedule(data, days):
                         out_of_selections = True
                         break
                     day, time = sel_times[0]
-                    if day <= 4:
-                        if not days["yellows"]:
-                            limit = days["weekdays"][time]
-                        else:
-                            limit = days["weekdays"][time] - 1 if time in (3, 4, 5) else days["weekdays"][time]
-                    else:
-                        limit = days["weekends"][time]
+                    limit = required(day, time)
 
                 if out_of_selections:
                     break
@@ -114,12 +120,10 @@ def schedule(data, days):
             shift_names = ["12am–3am","3am–6am","6am–9am","9am–12pm","12pm–3pm","3pm–6pm","6pm–9pm","9pm–12am"]
             unfilled = []
             for day_i in range(7):
-                caps = days["weekdays"] if day_i <= 4 else days["weekends"]
-                for shift_i, cap in enumerate(caps):
+                for shift_i in range(8):
                     if shift_i == 1:
                         continue
-                    required = cap - 1 if (days["yellows"] and day_i <= 4 and shift_i in (3, 4, 5)) else cap
-                    short = required - len(schedule_grid[day_i][shift_i])
+                    short = required(day_i, shift_i) - len(schedule_grid[day_i][shift_i])
                     for _ in range(short):
                         unfilled.append(f"{day_names[day_i]} {shift_names[shift_i]}")
             for username, grave_days in pending_graves.items():
@@ -131,16 +135,17 @@ def schedule(data, days):
     # Use original_prefs so preferences popped during the main loop aren't lost.
     # Fill in priority order; stop each slot once capacity is reached.
 
-    if days["yellows"]:
-        for day_i in range(5):  # weekdays only
-            for shift_i in (3, 4, 5):
-                cap = days["weekdays"][shift_i]
-                for user in users:
-                    if len(schedule_grid[day_i][shift_i]) >= cap:
-                        break
-                    username = user[0]
-                    wanted = any(p[0] == day_i and p[1] == shift_i for p in original_prefs[username])
-                    if wanted and username not in schedule_grid[day_i][shift_i]:
-                        schedule_grid[day_i][shift_i].append(username)
+    for day_i in range(7):
+        for shift_i in (3, 4, 5):
+            if not is_yellow(day_i, shift_i):
+                continue
+            cap = caps_by_day[day_i][shift_i]
+            for user in users:
+                if len(schedule_grid[day_i][shift_i]) >= cap:
+                    break
+                username = user[0]
+                wanted = any(p[0] == day_i and p[1] == shift_i for p in original_prefs[username])
+                if wanted and username not in schedule_grid[day_i][shift_i]:
+                    schedule_grid[day_i][shift_i].append(username)
 
     return schedule_grid

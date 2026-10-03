@@ -212,6 +212,24 @@
     .swatch.double { background: #a9dfb3; border-color: #2f9e44; }
     .legend { display: flex; gap: 16px; font-size: 0.8rem; color: #666; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
     .legend .slot { vertical-align: middle; margin-right: 4px; }
+
+    /* Per-day overrides */
+    .day-edit { background: none; border: 1px solid transparent; border-radius: 5px; padding: 2px 6px; font: inherit; font-weight: 600; color: inherit; cursor: pointer; white-space: nowrap; }
+    .day-edit::after { content: " ✎"; color: #aab4d8; font-weight: 400; }
+    .day-edit:hover { border-color: #b8c4f0; background: #fff; }
+    .result-table th.edited { background: #ffe8cc; }
+    .result-table th.edited .day-edit::after { color: #d9480f; }
+    .day-note { display: block; font-size: 0.68rem; font-weight: 500; color: #d9480f; margin-top: 2px; }
+    .swatch.edited { background: #ffe8cc; border-color: #ffc078; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 90; padding: 16px; }
+    .modal-box { background: white; border-radius: 10px; padding: 22px; width: 100%; max-width: 640px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); max-height: 100%; overflow-y: auto; }
+    .modal-box h2 { margin-bottom: 4px; }
+    .modal-sub { font-size: 0.8rem; color: #777; margin-bottom: 14px; }
+    .modal-box .field-group { margin-bottom: 14px; }
+    .modal-box .field-group input[type="text"] { width: 100%; font-size: 0.9rem; padding: 7px 10px; border: 1px solid #ccc; border-radius: 6px; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
+    .modal-actions .spacer { flex: 1; }
+    .modal-box .shift-grid { grid-template-columns: repeat(4, 1fr); }
   </style>
 </head>
 <body>
@@ -309,12 +327,13 @@
 
 <div class="card">
   <h2>Schedule Preview</h2>
-  <div class="results-note">This is the preview of the schedule, built from the options you select from the Create Schedule tab. <b>Click or drag to mark shifts as incentive pay.</b></div>
+  <div class="results-note">This is the preview of the schedule, built from the options you select from the Create Schedule tab. <b>Click or drag to mark shifts as incentive pay.</b> Click a day's name to change the shift sizes or yellows for just that day (holidays etc.).</div>
   <div class="legend" id="preview-legend">
     <span><span class="slot"></span> Required slot</span>
     <span id="legend-yellow"><span class="slot yellow"></span> Yellow (optional extra) slot</span>
     <span><span class="swatch"></span> Incentive pay</span>
     <span><span class="swatch double"></span> Extra incentive pay</span>
+    <span><span class="swatch edited"></span> Day with its own shift sizes</span>
   </div>
   <div id="preview-grid"></div>
 </div>
@@ -329,6 +348,29 @@
 <div class="status" id="create-status"></div>
 
 </div><!-- /tab-preview -->
+
+<div class="modal-overlay" id="day-modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="day-modal-title">
+    <h2 id="day-modal-title"></h2>
+    <div class="modal-sub">These shift sizes apply to this one day only. Every other day keeps the sizes from the Create Schedule tab.</div>
+    <div class="field-group">
+      <label for="day-note">Note (optional, shown on the schedule and in the Excel notes row)</label>
+      <input type="text" id="day-note" maxlength="60" placeholder="e.g. Thanksgiving">
+    </div>
+    <div class="section-label">Number of people per shift</div>
+    <div class="shift-grid" id="day-grid"></div>
+    <div class="yellows-row">
+      <input type="checkbox" id="day-yellows">
+      <label for="day-yellows">Yellows on this day?</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="day-reset" onclick="resetDayOverride()">Reset to default</button>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost" onclick="closeDayEditor()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveDayOverride()">Save</button>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════════════ RUN SCHEDULE ═══════════════ -->
 <div class="tab-panel" id="tab-run">
@@ -372,7 +414,15 @@
 
   // ── State ─────────────────────────────────────────────────────────────────
 
-  let draft = { start: null, end: null, weeks: [], settings: null, workers: [], incentives: {} };  // being edited
+  let draft = { start: null, end: null, weeks: [], settings: null, workers: [], incentives: {}, overrides: {} };  // being edited
+
+  // Shift sizes and yellows for one day: the day's override if it has one, else the defaults.
+  function dayConfig(setup, week, di) {
+    const o = setup && setup.overrides && setup.overrides[week] && setup.overrides[week][di];
+    if (o) return { caps: o.caps, yellows: !!o.yellows, note: o.note || "", edited: true };
+    const s = setup.settings;
+    return { caps: di <= 4 ? s.weekdays : s.weekends, yellows: !!s.yellows && di <= 4, note: "", edited: false };
+  }
 
   // 0 = none, 1 = incentive pay, 2 = double incentive pay
   function incentiveLevel(setup, week, di, si) {
@@ -482,7 +532,8 @@
         yellows: document.getElementById("yellows").checked
       },
       workers: draft.workers,
-      incentives: draft.incentives || {}
+      incentives: draft.incentives || {},
+      overrides: draft.overrides || {}
     };
   }
 
@@ -544,6 +595,7 @@
       if (weeksChanged) {
         // Drop incentive marks for weeks that left the period
         Object.keys(draft.incentives || {}).forEach(w => { if (!draft.weeks.includes(w)) delete draft.incentives[w]; });
+        Object.keys(draft.overrides || {}).forEach(w => { if (!draft.weeks.includes(w)) delete draft.overrides[w]; });
         renderWeeks();
         if (document.getElementById("tab-preview").classList.contains("active")) renderPreview();
       }
@@ -617,7 +669,7 @@
 
   function setupsDiffer(a, b) {
     if (!a || !b) return true;
-    const strip = x => JSON.stringify({ weeks: x.weeks, settings: x.settings, workers: x.workers, incentives: x.incentives || {} });
+    const strip = x => JSON.stringify({ weeks: x.weeks, settings: x.settings, workers: x.workers, incentives: x.incentives || {}, overrides: x.overrides || {} });
     return strip(a) !== strip(b);
   }
 
@@ -648,18 +700,19 @@
       grid.innerHTML = '<p class="empty-msg">Pick a start and end date on the Create Schedule tab to see the preview.</p>';
       return;
     }
-    document.getElementById("legend-yellow").style.display = s.yellows ? "" : "none";
+    const anyOverrideYellows = Object.values(draft.overrides || {}).some(w => Object.values(w).some(o => o.yellows));
+    document.getElementById("legend-yellow").style.display = s.yellows || anyOverrideYellows ? "" : "none";
 
     grid.innerHTML = draft.weeks.map(week => {
-      const monday = parseISO(week);
+      const days = DAY_LABELS.map((_, di) => dayConfig(draft, week, di));
       let html = `<div class="week-result"><h3>Week of ${weekLabel(week)}</h3><div class="result-scroll"><table class="result-table">
-        <thead><tr><th>Shift</th>${DAY_LABELS.map((d, i) => `<th>${d} ${numericDate(addDays(monday, i))}</th>`).join("")}</tr></thead><tbody>`;
+        <thead><tr><th>Shift</th>${dayHeaders(week, days, true)}</tr></thead><tbody>`;
       SHIFT_LABELS.forEach((label, si) => {
         const isYellowShift = s.yellows && YELLOW_SHIFTS.includes(si);
         html += `<tr><td class="shift-label${isYellowShift ? " yellow" : ""}">${label}</td>`;
         DAY_LABELS.forEach((_, di) => {
-          const cap = di <= 4 ? s.weekdays[si] : s.weekends[si];
-          const yellowHere = isYellowShift && di <= 4 && cap > 0;
+          const cap = days[di].caps[si];
+          const yellowHere = days[di].yellows && YELLOW_SHIFTS.includes(si) && cap > 0;
           const lvl = incentiveLevel(draft, week, di, si);
           const attrs = `class="clickable${incentiveClass(lvl)}" data-week="${week}" data-day="${di}" data-shift="${si}" title="${LEVEL_NAMES[lvl]} — click for ${LEVEL_NAMES[(lvl + 1) % 3]}"`;
           if (cap <= 0) { html += `<td ${attrs}><span class="empty-slot">—</span></td>`; return; }
@@ -672,6 +725,86 @@
       return html + "</tbody></table></div></div>";
     }).join("");
   }
+
+  function escapeHTML(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  }
+
+  // <th> cells for a week's days. On the preview the day name opens the day editor.
+  function dayHeaders(week, days, editable) {
+    const monday = parseISO(week);
+    return DAY_LABELS.map((d, di) => {
+      const text = `${d} ${numericDate(addDays(monday, di))}`;
+      const name = editable
+        ? `<button type="button" class="day-edit" data-week="${week}" data-day="${di}" title="Change shift sizes for this day">${text}</button>`
+        : text;
+      const note = days[di].note ? `<span class="day-note">${escapeHTML(days[di].note)}</span>` : "";
+      return `<th${days[di].edited ? ' class="edited"' : ""}>${name}${note}</th>`;
+    }).join("");
+  }
+
+  // ── Day editor: shift sizes for one day ───────────────────────────────────
+
+  let editingDay = null;   // { week, day }
+
+  function openDayEditor(week, di) {
+    editingDay = { week, day: di };
+    const cfg = dayConfig(draft, week, di);
+    const date = addDays(parseISO(week), di);
+    document.getElementById("day-modal-title").textContent =
+      date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+    document.getElementById("day-note").value = cfg.note;
+    buildGrid("day-grid", cfg.caps);
+    document.getElementById("day-yellows").checked = cfg.yellows;
+    updateDayYellowHighlight();
+    document.getElementById("day-reset").hidden = !cfg.edited;
+    document.getElementById("day-modal").hidden = false;
+    document.querySelector("#day-grid input:not([disabled])").focus();
+  }
+
+  function updateDayYellowHighlight() {
+    const checked = document.getElementById("day-yellows").checked;
+    YELLOW_SHIFTS.forEach(i => document.querySelector(`#day-grid [data-shift="${i}"]`).classList.toggle("yellow", checked));
+  }
+  document.getElementById("day-yellows").addEventListener("change", updateDayYellowHighlight);
+
+  function closeDayEditor() {
+    editingDay = null;
+    document.getElementById("day-modal").hidden = true;
+  }
+
+  function setDayOverride(override) {
+    const { week, day } = editingDay;
+    if (!draft.overrides) draft.overrides = {};
+    const byDay = { ...(draft.overrides[week] || {}) };
+    if (override) byDay[day] = override; else delete byDay[day];
+    if (Object.keys(byDay).length > 0) draft.overrides[week] = byDay; else delete draft.overrides[week];
+    closeDayEditor();
+    renderPreview();
+    scheduleDraftSave();
+  }
+
+  function saveDayOverride() {
+    const caps = getCapacities("day-grid").map(c => Math.max(0, Math.min(20, c)));
+    caps[1] = caps[0];
+    const override = { caps, yellows: document.getElementById("day-yellows").checked, note: document.getElementById("day-note").value.trim() };
+    // Saving the defaults unchanged with no note is the same as no override
+    const def = dayConfig({ settings: draft.settings }, editingDay.week, editingDay.day);
+    const same = !override.note && override.yellows === def.yellows && JSON.stringify(caps) === JSON.stringify([def.caps[0], def.caps[0], ...def.caps.slice(2)]);
+    setDayOverride(same ? null : override);
+  }
+
+  function resetDayOverride() { setDayOverride(null); }
+
+  document.getElementById("day-modal").addEventListener("click", e => { if (e.target.id === "day-modal") closeDayEditor(); });
+  document.getElementById("day-modal").addEventListener("keydown", e => {
+    if (e.key === "Escape") closeDayEditor();
+    if (e.key === "Enter" && e.target.tagName === "INPUT") saveDayOverride();
+  });
+  document.getElementById("preview-grid").addEventListener("click", e => {
+    const btn = e.target.closest(".day-edit");
+    if (btn) openDayEditor(btn.dataset.week, parseInt(btn.dataset.day));
+  });
 
   function cellLevel(td) { return td.classList.contains("incentive2") ? 2 : td.classList.contains("incentive") ? 1 : 0; }
 
@@ -896,11 +1029,11 @@
     document.getElementById("results-note").textContent = `Run ${fmtStamp(results.run_at)}. Press Download button to download the schedule.`;
 
     document.getElementById("result-grid").innerHTML = results.weeks.map(w => {
-      const monday = parseISO(w.week);
       let html = `<div class="week-result"><h3>Week of ${weekLabel(w.week)}</h3>`;
       if (w.error) html += `<div class="week-error">Could not fill all required slots:<ul>${w.unfilled.map(u => `<li>${u}</li>`).join("")}</ul></div>`;
+      const days = published ? DAY_LABELS.map((_, di) => dayConfig(published, w.week, di)) : DAY_LABELS.map(() => ({ note: "", edited: false }));
       html += `<div class="result-scroll"><table class="result-table">
-        <thead><tr><th>Shift</th>${DAY_LABELS.map((d, i) => `<th>${d} ${numericDate(addDays(monday, i))}</th>`).join("")}</tr></thead><tbody>`;
+        <thead><tr><th>Shift</th>${dayHeaders(w.week, days, false)}</tr></thead><tbody>`;
       SHIFT_LABELS.forEach((label, si) => {
         const isYellow = results.yellows && YELLOW_SHIFTS.includes(si);
         html += `<tr><td class="shift-label${isYellow ? " yellow" : ""}">${label}</td>`;

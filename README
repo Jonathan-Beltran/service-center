@@ -17,7 +17,10 @@ How scheduling works
      none of it.
   2. Preview Schedule: shows the empty schedule built from the draft. Click a
      cell to mark that shift as incentive pay (green); workers see the same
-     green marking when picking shifts and on the posted schedule. Pressing
+     green marking when picking shifts and on the posted schedule. Click a
+     day's name to give that one day its own shift sizes, yellows and an
+     optional note (e.g. a holiday); other days keep the defaults, and the
+     note goes in the Excel notes row. Pressing
      "Create Schedule" publishes it. Workers can then open index.html, pick
      their initials, and rank shifts for each week. Coming back later reloads
      what they already submitted. Pressing Create Schedule again re-publishes
