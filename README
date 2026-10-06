@@ -31,6 +31,8 @@ How scheduling works
      mark shifts they absolutely cannot work; autofill never assigns those to
      them. Pressing Create Schedule again re-publishes
      the draft; submissions for weeks no longer in the period are deleted.
+     "Remove from Staff View" takes the schedule down so workers see nothing.
+     The draft and submitted shifts are kept; Create Schedule posts it again.
   3. Run Schedule: shows who has submitted, runs the algorithm on the published
      schedule, and shows the result. Workers never see it in the app;
      "Download Excel" produces a workbook (one sheet per week, laid out from

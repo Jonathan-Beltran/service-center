@@ -350,6 +350,7 @@
     <button class="btn-run" id="create-btn" onclick="createSchedule()" title="This creates the schedule for everyone.">Create Schedule</button>
     <span class="tooltip" role="tooltip">This creates the schedule, and releases it for everyone.</span>
   </div>
+  <button class="btn btn-danger" id="unpublish-btn" onclick="unpublishSchedule()" hidden>Remove from Staff View</button>
   <div class="action-info" id="create-info"></div>
 </div>
 <div class="status" id="create-status"></div>
@@ -687,7 +688,7 @@
     const el = document.getElementById("banner");
     if (!published) {
       el.className = "banner none";
-      el.innerHTML = `No schedule has been created yet. Workers see nothing until you press Create Schedule on the Preview Schedule tab.`;
+      el.innerHTML = `No schedule is posted to staff. Workers see nothing until you press Create Schedule on the Preview Schedule tab.`;
     } else if (setupsDiffer(draft, published)) {
       el.className = "banner draft";
       el.innerHTML = `You have unpublished changes. Workers still see the schedule created <strong>${fmtStamp(published.created_at)}</strong>. Press Create Schedule on the Preview Schedule tab to apply them.`;
@@ -699,6 +700,7 @@
     info.innerHTML = published
       ? `Workers currently see the schedule created <strong>${fmtStamp(published.created_at)}</strong>.` + (setupsDiffer(draft, published) ? " The preview above differs from it." : " The preview above matches it.")
       : "Workers cannot see anything until you create the schedule.";
+    document.getElementById("unpublish-btn").hidden = !published;
   }
 
   // ── Preview: the empty schedule ───────────────────────────────────────────
@@ -901,6 +903,28 @@
     } finally {
       btn.disabled = false;
       btn.textContent = "Create Schedule";
+    }
+  }
+
+  async function unpublishSchedule() {
+    const btn = document.getElementById("unpublish-btn");
+    const statusEl = document.getElementById("create-status");
+    if (!published) return;
+    if (!confirm("Remove the schedule from the staff view?\n\nWorkers will no longer see it or be able to submit shifts. Your draft and any shifts already submitted are kept; press Create Schedule to post it again.")) return;
+
+    btn.disabled = true;
+    try {
+      const res = await fetch("/publish", { method: "DELETE", headers: authHeaders() });
+      if (res.status === 401) { handleUnauthorized(); return; }
+      if (!res.ok) { showStatus(`Server error ${res.status}`, "error", statusEl); return; }
+      published = null;
+      updateBanner();
+      renderPreferences();
+      showStatus("Schedule removed from the staff view.", "success", statusEl);
+    } catch (err) {
+      showStatus(`Request failed: ${err.message}.`, "error", statusEl);
+    } finally {
+      btn.disabled = false;
     }
   }
 

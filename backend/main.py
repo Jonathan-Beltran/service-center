@@ -261,6 +261,15 @@ def publish():
         save_store()
     return published
 
+@app.delete("/publish", dependencies=[Depends(require_auth)])
+def unpublish():
+    """Take the schedule down so workers see nothing. The draft, submissions and
+    last results are kept, so Create Schedule brings everything back."""
+    with store_lock:
+        store["published"] = None
+        save_store()
+    return {"status": "ok"}
+
 @app.get("/published")
 def get_published():
     """What workers see: the open weeks, the worker list, and when it was created."""
@@ -406,7 +415,9 @@ def get_results():
 @app.get("/results.xlsx", dependencies=[Depends(require_auth)])
 def download_results():
     """The last run as an Excel workbook, one sheet per week."""
-    if not store["results"] or not store["published"]:
+    if not store["published"]:
+        raise HTTPException(status_code=400, detail="The schedule is not posted to staff. Create it again to download")
+    if not store["results"]:
         raise HTTPException(status_code=400, detail="Run the schedule first")
     data = build_workbook(store["results"], store["published"])
     first = store["results"]["weeks"][0]["week"] if store["results"]["weeks"] else "schedule"
