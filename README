@@ -11,7 +11,7 @@ Frontend
   - frontend/index.html — the worker shift picker
   - frontend/admin.html — the admin panel
 How scheduling works
-  Supervisor panel (admin.html) has three tabs:
+  Supervisor panel (admin.html) has four tabs:
   1. Create Schedule: set the period (start and end dates), shift sizes, and
      import workers. This is a draft. It saves as you type, but workers see
      none of it.
@@ -37,6 +37,9 @@ How scheduling works
      schedule, and shows the result. Workers never see it in the app;
      "Download Excel" produces a workbook (one sheet per week, laid out from
      backend/template.xlsx) for the supervisor to share.
+  4. History: a log of every schedule created (posted to staff) or removed
+     from the staff view, newest first, with the period, workers and settings
+     each one had. Kept in the same JSON file (last 500 entries).
 
 Persistence
   All state (draft, published schedule, submissions, results) is saved to a

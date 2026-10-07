@@ -72,6 +72,8 @@ def admin_login(body: LoginRequest):
 #   "preferences":    {"HM": {"2026-09-21": [[day, shift], ...], ...}, ...}
 #   "unavailable":    same shape; shifts a worker cannot work, never autofilled onto them
 #   "results":        last run of the algorithm, supervisor only: {"run_at", "weeks": [...]}
+#   "history":        log of schedules posted/removed, oldest first:
+#                     [{"at", "action": "created" | "removed", "setup": published setup}, ...]
 # }
 
 DEFAULT_SETTINGS = {
@@ -91,6 +93,7 @@ def _empty_store() -> dict:
         "preferences": {},
         "unavailable": {},
         "results": None,
+        "history": [],
     }
 
 def _load_store() -> dict:
@@ -104,6 +107,9 @@ def _load_store() -> dict:
                     base[key] = data[key]
     except (FileNotFoundError, json.JSONDecodeError):
         pass
+    # Stores from before the log existed: start it with the schedule that is live now
+    if not base["history"] and base["published"]:
+        base["history"].append({"at": base["published"].get("created_at"), "action": "created", "setup": deepcopy(base["published"])})
     return base
 
 store = _load_store()
@@ -117,6 +123,13 @@ def save_store():
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+MAX_HISTORY = 500
+
+def _log(action: str, setup: dict):
+    """Append to the schedule log. Call with store_lock held; the caller saves."""
+    store["history"].append({"at": _now(), "action": action, "setup": deepcopy(setup)})
+    del store["history"][:-MAX_HISTORY]
 
 # ── Models ────────────────────────────────────────────────────────────────────
 
@@ -258,6 +271,7 @@ def publish():
                     del store[key][initials]
         if store["results"]:
             store["results"]["weeks"] = [r for r in store["results"]["weeks"] if r["week"] in keep]
+        _log("created", published)
         save_store()
     return published
 
@@ -266,9 +280,16 @@ def unpublish():
     """Take the schedule down so workers see nothing. The draft, submissions and
     last results are kept, so Create Schedule brings everything back."""
     with store_lock:
+        if store["published"]:
+            _log("removed", store["published"])
         store["published"] = None
         save_store()
     return {"status": "ok"}
+
+@app.get("/history", dependencies=[Depends(require_auth)])
+def get_history():
+    """Every schedule posted to or removed from the staff view, newest first."""
+    return list(reversed(store["history"]))
 
 @app.get("/published")
 def get_published():
@@ -432,7 +453,7 @@ def download_results():
 @app.middleware("http")
 async def no_cache_static(request, call_next):
     response = await call_next(request)
-    if not request.url.path.startswith(("/admin/", "/draft", "/publish", "/published", "/preferences",
+    if not request.url.path.startswith(("/admin/", "/draft", "/publish", "/published", "/preferences", "/history",
                                         "/submit_preference", "/run_schedule", "/results")):
         response.headers["Cache-Control"] = "no-cache"
     return response

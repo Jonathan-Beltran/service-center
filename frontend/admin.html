@@ -115,6 +115,13 @@
     .pref-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f8f9fa; border-radius: 6px; margin-bottom: 6px; font-size: 0.85rem; flex-wrap: wrap; gap: 6px; }
     .pref-item .initials { font-weight: 700; margin-right: 8px; }
     .pref-item .count { color: #777; }
+    .history-table td { vertical-align: top; }
+    .history-table details summary { cursor: pointer; color: #3b5bdb; font-size: 0.82rem; }
+    .history-table details div { font-size: 0.8rem; color: #555; margin-top: 6px; line-height: 1.5; }
+    .action-tag { display: inline-block; font-size: 0.75rem; font-weight: 600; border-radius: 4px; padding: 2px 8px; white-space: nowrap; }
+    .action-tag.created { background: #d3f9d8; color: #2b8a3e; }
+    .action-tag.removed { background: #ffe3e3; color: #c92a2a; }
+    .history-current { font-size: 0.72rem; color: #2b8a3e; font-weight: 600; margin-left: 6px; }
     .pref-item .cant-work { color: #c92a2a; font-size: 0.78rem; margin-left: 10px; }
     .pref-weeks { display: flex; flex-wrap: wrap; gap: 4px; }
     .week-chip { font-size: 0.72rem; border-radius: 4px; padding: 2px 7px; background: #d3f9d8; color: #2b8a3e; white-space: nowrap; }
@@ -254,6 +261,7 @@
   <button class="tab active" data-tab="create" onclick="showTab('create')">Create Schedule</button>
   <button class="tab" data-tab="preview" onclick="showTab('preview')">Preview Schedule</button>
   <button class="tab" data-tab="run" onclick="showTab('run')">Run Schedule</button>
+  <button class="tab" data-tab="history" onclick="showTab('history')">History</button>
 </div>
 
 <div class="banner none" id="banner"></div>
@@ -381,6 +389,20 @@
 </div>
 
 <!-- ═══════════════ RUN SCHEDULE ═══════════════ -->
+<!-- ═══════════════ HISTORY ═══════════════ -->
+<div class="tab-panel" id="tab-history">
+
+<div class="card">
+  <div class="card-head">
+    <h2>Schedule History</h2>
+    <button class="btn btn-ghost" onclick="loadHistory()">Refresh</button>
+  </div>
+  <div class="results-note">Every time a schedule was created (posted to staff) or removed from the staff view, newest first.</div>
+  <div id="history-list"><p class="empty-msg">Loading…</p></div>
+</div>
+
+</div><!-- /tab-history -->
+
 <div class="tab-panel" id="tab-run">
 
 <div class="card">
@@ -459,6 +481,7 @@
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === `tab-${name}`));
     try { sessionStorage.setItem("adminTab", name); } catch {}
     if (name === "preview") renderPreview();
+    if (name === "history") loadHistory();
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -1093,6 +1116,48 @@
   function showStatus(msg, type, el) {
     el.className = `status ${type}`;
     el.textContent = msg;
+  }
+
+  // ── History: log of schedules created / removed ──────────────────────────
+
+  function historyDetails(setup) {
+    const s = setup.settings || {};
+    const editedDays = Object.values(setup.overrides || {}).reduce((n, w) => n + Object.keys(w).length, 0);
+    const incentiveCells = Object.values(setup.incentives || {}).reduce((n, cells) => n + cells.length, 0);
+    const notes = Object.entries(setup.overrides || {}).flatMap(([week, days]) =>
+      Object.entries(days).filter(([, o]) => o.note).map(([di, o]) => `${shortDate(addDays(parseISO(week), +di))} (${escapeHTML(o.note)})`));
+    const workers = (setup.workers || []).map(w => `${escapeHTML(w.initials)}${w.doubles ? " (doubles)" : ""}`).join(", ");
+    return `<details><summary>Details</summary><div>
+      Weekday sizes: ${(s.weekdays || []).join(" / ")}<br>
+      Weekend sizes: ${(s.weekends || []).join(" / ")}<br>
+      Yellows: ${s.yellows ? "on" : "off"} · Autofill: ${s.autofill === false ? "off" : "on"}<br>
+      Days with their own sizes: ${editedDays}${notes.length ? ` — ${notes.join(", ")}` : ""}<br>
+      Incentive shifts marked: ${incentiveCells}<br>
+      Workers: ${workers || "none"}
+    </div></details>`;
+  }
+
+  async function loadHistory() {
+    const list = document.getElementById("history-list");
+    const entries = await fetchJSON("/history", true);
+    if (!entries) { list.innerHTML = '<p class="empty-msg">Could not load the history.</p>'; return; }
+    if (entries.length === 0) { list.innerHTML = '<p class="empty-msg">No schedules have been created yet.</p>'; return; }
+    const rows = entries.map((e, i) => {
+      const st = e.setup || {};
+      const period = st.start && st.end ? `${shortDate(parseISO(st.start))} – ${shortDate(parseISO(st.end))}, ${parseISO(st.end).getFullYear()}` : "—";
+      const isCurrent = published && e.action === "created" && st.created_at === published.created_at;
+      return `<tr>
+        <td style="white-space:nowrap">${e.at ? fmtStamp(e.at) : "—"}</td>
+        <td><span class="action-tag ${e.action}">${e.action === "created" ? "Created" : "Removed from staff view"}</span>${isCurrent ? '<span class="history-current">LIVE NOW</span>' : ""}</td>
+        <td style="white-space:nowrap">${period}</td>
+        <td class="center">${(st.weeks || []).length}</td>
+        <td class="center">${(st.workers || []).length}</td>
+        <td>${historyDetails(st)}</td>
+      </tr>`;
+    }).join("");
+    list.innerHTML = `<div class="result-scroll"><table class="history-table">
+      <thead><tr><th>When</th><th>Action</th><th>Period</th><th style="text-align:center">Weeks</th><th style="text-align:center">Workers</th><th></th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`;
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
