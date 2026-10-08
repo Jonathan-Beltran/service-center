@@ -71,9 +71,9 @@ def admin_login(body: LoginRequest):
 #   "published":      setup workers see, plus "created_at"; None until Create Schedule
 #   "preferences":    {"HM": {"2026-09-21": [[day, shift], ...], ...}, ...}
 #   "unavailable":    same shape; shifts a worker cannot work, never autofilled onto them
-#   "results":        last run of the algorithm, supervisor only: {"run_at", "weeks": [...]}
-#   "history":        log of schedules posted/removed, oldest first:
-#                     [{"at", "action": "created" | "removed", "setup": published setup}, ...]
+#   "results":        last run of the algorithm, supervisor only:
+#                     {"id", "run_at", "yellows", "submitted", "weeks": [...], "setup": published setup it ran on}
+#   "runs":           every run, oldest first, same shape as "results" (the History tab)
 # }
 
 DEFAULT_SETTINGS = {
@@ -93,7 +93,7 @@ def _empty_store() -> dict:
         "preferences": {},
         "unavailable": {},
         "results": None,
-        "history": [],
+        "runs": [],
     }
 
 def _load_store() -> dict:
@@ -107,9 +107,12 @@ def _load_store() -> dict:
                     base[key] = data[key]
     except (FileNotFoundError, json.JSONDecodeError):
         pass
-    # Stores from before the log existed: start it with the schedule that is live now
-    if not base["history"] and base["published"]:
-        base["history"].append({"at": base["published"].get("created_at"), "action": "created", "setup": deepcopy(base["published"])})
+    # Stores from before the run log existed: start it with the last run
+    if not base["runs"] and base["results"] and base["results"].get("run_at"):
+        last = base["results"]
+        last.setdefault("id", secrets.token_hex(6))
+        last.setdefault("setup", deepcopy(base["published"]))
+        base["runs"].append(last)
     return base
 
 store = _load_store()
@@ -124,12 +127,7 @@ def save_store():
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
-MAX_HISTORY = 500
-
-def _log(action: str, setup: dict):
-    """Append to the schedule log. Call with store_lock held; the caller saves."""
-    store["history"].append({"at": _now(), "action": action, "setup": deepcopy(setup)})
-    del store["history"][:-MAX_HISTORY]
+MAX_RUNS = 200   # oldest runs drop off the History tab past this
 
 # ── Models ────────────────────────────────────────────────────────────────────
 
@@ -271,7 +269,6 @@ def publish():
                     del store[key][initials]
         if store["results"]:
             store["results"]["weeks"] = [r for r in store["results"]["weeks"] if r["week"] in keep]
-        _log("created", published)
         save_store()
     return published
 
@@ -280,16 +277,9 @@ def unpublish():
     """Take the schedule down so workers see nothing. The draft, submissions and
     last results are kept, so Create Schedule brings everything back."""
     with store_lock:
-        if store["published"]:
-            _log("removed", store["published"])
         store["published"] = None
         save_store()
     return {"status": "ok"}
-
-@app.get("/history", dependencies=[Depends(require_auth)])
-def get_history():
-    """Every schedule posted to or removed from the staff view, newest first."""
-    return list(reversed(store["history"]))
 
 @app.get("/published")
 def get_published():
@@ -423,9 +413,18 @@ def run_schedule():
         out = schedule(data, days)
         results.append({"week": week, **out})
 
-    run = {"run_at": _now(), "yellows": settings["yellows"], "weeks": results}
+    run = {
+        "id": secrets.token_hex(6),
+        "run_at": _now(),
+        "yellows": settings["yellows"],
+        "submitted": sum(1 for by_week in store["preferences"].values() if any(by_week.get(w) for w in pub["weeks"])),
+        "weeks": results,
+        "setup": deepcopy(pub),   # so History can show and export it after the schedule changes
+    }
     with store_lock:
         store["results"] = run
+        store["runs"].append(run)
+        del store["runs"][:-MAX_RUNS]
         save_store()
     return run
 
@@ -433,27 +432,67 @@ def run_schedule():
 def get_results():
     return store["results"] or {"run_at": None, "yellows": False, "weeks": []}
 
-@app.get("/results.xlsx", dependencies=[Depends(require_auth)])
-def download_results():
-    """The last run as an Excel workbook, one sheet per week."""
-    if not store["published"]:
-        raise HTTPException(status_code=400, detail="The schedule is not posted to staff. Create it again to download")
-    if not store["results"]:
-        raise HTTPException(status_code=400, detail="Run the schedule first")
-    data = build_workbook(store["results"], store["published"])
-    first = store["results"]["weeks"][0]["week"] if store["results"]["weeks"] else "schedule"
+def _xlsx_response(run: dict) -> Response:
+    setup = run.get("setup") or store["published"]
+    if not setup:
+        raise HTTPException(status_code=400, detail="This run has no saved schedule settings to export")
+    data = build_workbook(run, setup)
+    first = run["weeks"][0]["week"] if run["weeks"] else "schedule"
+    ran = (run.get("run_at") or "")[:10]
+    name = f"schedule-{first}" + (f"-run-{ran}" if ran else "")
     return Response(
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="schedule-{first}.xlsx"'},
+        headers={"Content-Disposition": f'attachment; filename="{name}.xlsx"'},
     )
+
+@app.get("/results.xlsx", dependencies=[Depends(require_auth)])
+def download_results():
+    """The last run as an Excel workbook, one sheet per week."""
+    if not store["results"]:
+        raise HTTPException(status_code=400, detail="Run the schedule first")
+    return _xlsx_response(store["results"])
+
+def _find_run(run_id: str) -> dict:
+    for run in store["runs"]:
+        if run.get("id") == run_id:
+            return run
+    raise HTTPException(status_code=404, detail="That run is no longer in the history")
+
+@app.get("/runs", dependencies=[Depends(require_auth)])
+def list_runs():
+    """Every run, newest first, summarised for the History tab."""
+    out = []
+    for run in reversed(store["runs"]):
+        setup = run.get("setup") or {}
+        out.append({
+            "id": run["id"],
+            "run_at": run["run_at"],
+            "start": setup.get("start"),
+            "end": setup.get("end"),
+            "weeks": len(run["weeks"]),
+            "short_weeks": sum(1 for w in run["weeks"] if w.get("error")),
+            "unfilled": sum(len(w.get("unfilled", [])) for w in run["weeks"]),
+            "forced": sum(1 for w in run["weeks"] for f in w.get("forced", []) if f[1] != 1),
+            "workers": len(setup.get("workers", [])),
+            "submitted": run.get("submitted"),
+        })
+    return out
+
+@app.get("/runs/{run_id}", dependencies=[Depends(require_auth)])
+def get_run(run_id: str):
+    return _find_run(run_id)
+
+@app.get("/runs/{run_id}/excel", dependencies=[Depends(require_auth)])
+def download_run(run_id: str):
+    return _xlsx_response(_find_run(run_id))
 
 # The pages are plain files that change on every deploy. Tell browsers to
 # re-check them on each load so nobody runs a stale copy against a new API.
 @app.middleware("http")
 async def no_cache_static(request, call_next):
     response = await call_next(request)
-    if not request.url.path.startswith(("/admin/", "/draft", "/publish", "/published", "/preferences", "/history",
+    if not request.url.path.startswith(("/admin/", "/draft", "/publish", "/published", "/preferences", "/runs",
                                         "/submit_preference", "/run_schedule", "/results")):
         response.headers["Cache-Control"] = "no-cache"
     return response

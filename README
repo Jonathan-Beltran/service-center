@@ -37,9 +37,11 @@ How scheduling works
      schedule, and shows the result. Workers never see it in the app;
      "Download Excel" produces a workbook (one sheet per week, laid out from
      backend/template.xlsx) for the supervisor to share.
-  4. History: a log of every schedule created (posted to staff) or removed
-     from the staff view, newest first, with the period, workers and settings
-     each one had. Kept in the same JSON file (last 500 entries).
+  4. History: every time the schedule was run, newest first, with the date
+     it ran, the period and whether every seat was filled. Each run can be
+     viewed again or downloaded as Excel; it keeps the settings it ran with,
+     so later changes to the schedule don't alter it. The last 200 runs are
+     kept in the same JSON file.
 
 Persistence
   All state (draft, published schedule, submissions, results) is saved to a
