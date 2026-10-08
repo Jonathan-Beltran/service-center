@@ -424,6 +424,7 @@
   <div class="pref-actions">
     <button class="btn btn-primary" onclick="loadPreferences()">Refresh</button>
     <button class="btn btn-ghost" onclick="clearPreferences()">Clear All</button>
+    <span class="save-state" id="pref-updated" style="align-self:center"></span>
   </div>
   <div class="pref-list" id="pref-list"><p class="empty-msg">Loading…</p></div>
 </div>
@@ -1000,18 +1001,34 @@
     list.innerHTML = summary + (items || '<p class="empty-msg">No submissions yet.</p>') + missing;
   }
 
-  async function loadPreferences() {
+  // quiet: a background poll. Only re-render when something changed, and keep
+  // the current list on a network hiccup instead of replacing it with an error.
+  async function loadPreferences(quiet = false) {
     try {
       const res = await fetch("/preferences", { headers: authHeaders() });
       if (res.status === 401) { handleUnauthorized(); return; }
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
-      preferences = data.map(p => ({ initials: p.initials, weeks: p.weeks || {}, unavailable: p.unavailable || {} }));
-      renderPreferences();
+      const next = data.map(p => ({ initials: p.initials, weeks: p.weeks || {}, unavailable: p.unavailable || {} }));
+      const changed = JSON.stringify(next) !== JSON.stringify(preferences);
+      preferences = next;
+      if (changed || !quiet) renderPreferences();
+      document.getElementById("pref-updated").textContent =
+        `Updates automatically · last checked ${new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" })}`;
     } catch (err) {
-      document.getElementById("pref-list").innerHTML = `<p class="empty-msg">Could not load submissions: ${err.message}</p>`;
+      if (!quiet) document.getElementById("pref-list").innerHTML = `<p class="empty-msg">Could not load submissions: ${err.message}</p>`;
     }
   }
+
+  // Pick up new worker submissions without a manual refresh. Polls only while
+  // the page is visible and signed in, and checks right away on returning to it.
+  const PREF_POLL_MS = 10000;
+  setInterval(() => {
+    if (adminToken && document.visibilityState === "visible") loadPreferences(true);
+  }, PREF_POLL_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (adminToken && document.visibilityState === "visible") loadPreferences(true);
+  });
 
   async function removePref(initials) {
     try {

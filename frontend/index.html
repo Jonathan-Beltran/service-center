@@ -619,22 +619,38 @@
       renderWeek();
     });
 
+    let publishedAt;   // created_at of the schedule on screen; undefined until first load
+
+    async function fetchPublished() {
+      try {
+        const res = await fetch("/published");
+        if (res.ok) return await res.json();
+      } catch { /* treated as unreachable */ }
+      return null;
+    }
+
     async function loadPublished() {
+      applyPublished(await fetchPublished());
+    }
+
+    // Draw whatever the supervisor currently has posted. Safe to call again
+    // later: the chosen initials and unsaved picks are kept where they still apply.
+    function applyPublished(pub) {
       const select = document.getElementById("user-select");
       const notice = document.getElementById("notice");
       const picker = document.getElementById("picker");
-      let pub = null;
-      try {
-        const res = await fetch("/published");
-        if (res.ok) pub = await res.json();
-      } catch { /* handled below */ }
+      const wasLive = !!publishedAt;
+      publishedAt = pub ? pub.created_at : publishedAt;
 
       weeks = pub ? (pub.weeks || []) : [];
       incentives = pub ? (pub.incentives || {}) : {};
       const workers = pub ? (pub.workers || []) : [];
 
+      const live = !!(pub && pub.created_at);
       if (!pub) {
         select.innerHTML = '<option value="">— Could not load —</option>';
+      } else if (!live) {
+        select.innerHTML = '<option value="">— Schedule not posted —</option>';
       } else if (workers.length === 0) {
         select.innerHTML = '<option value="">— No workers yet —</option>';
       } else {
@@ -647,22 +663,52 @@
         });
       }
 
+      // While the schedule is down, keep the signed-in worker and their unsaved
+      // picks as they are. Once one is posted, keep them only where they still apply.
+      if (live) {
+        if (currentUser && workers.some(w => w.initials === currentUser)) {
+          select.value = currentUser;
+        } else if (currentUser) {
+          currentUser = "";
+          selections = {};
+          blocked = {};
+          document.getElementById("week").classList.add("no-user");
+        }
+        Object.keys(selections).forEach(w => { if (!weeks.includes(w)) delete selections[w]; });
+        Object.keys(blocked).forEach(w => { if (!weeks.includes(w)) delete blocked[w]; });
+      }
+
       if (weeks.length === 0) {
-        notice.textContent = pub
-          ? "Supervisors have not released the schedule yet. Refresh or check back later."
-          : "Could not reach the server. Try again in a moment.";
+        notice.textContent = !pub
+          ? "Could not reach the server. Try again in a moment."
+          : wasLive
+            ? "A supervisor has closed the schedule."
+            : "Supervisors have not released the schedule yet. This page will update when it is posted.";
         notice.style.display = "block";
         picker.style.display = "none";
         document.getElementById("submit-btn").disabled = true;
+        activeWeek = null;
       } else {
         notice.style.display = "none";
         picker.style.display = "";
         document.getElementById("submit-btn").disabled = false;
-        activeWeek = weeks[0];
+        if (!weeks.includes(activeWeek)) activeWeek = weeks[0];
       }
       renderWeekTabs();
       renderWeek();
     }
+
+    // Follow the supervisor: when the schedule is taken down, re-posted or
+    // changed, update the page without a manual refresh. Polls only while the
+    // page is visible, and checks right away on returning to it.
+    async function checkPublished() {
+      if (document.visibilityState !== "visible") return;
+      const pub = await fetchPublished();
+      if (!pub) return;   // network hiccup: keep what is on screen
+      if (pub.created_at !== publishedAt) applyPublished(pub);
+    }
+    setInterval(checkPublished, 10000);
+    document.addEventListener("visibilitychange", checkPublished);
 
     loadPublished();
     initDayTabs();
