@@ -123,6 +123,14 @@
     .run-tag.ok { background: #d3f9d8; color: #2b8a3e; }
     .run-tag.short { background: #ffe3e3; color: #c92a2a; }
     .latest-tag { font-size: 0.72rem; color: #3b5bdb; font-weight: 600; margin-left: 6px; }
+    .cw-controls { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin-bottom: 12px; }
+    .cw-controls select { font-size: 0.9rem; padding: 7px 10px; border: 1px solid #ccc; border-radius: 6px; background: white; min-width: 160px; }
+    .result-table td.cw-cell { cursor: pointer; user-select: none; -webkit-user-select: none; color: #ccc; }
+    .result-table td.cw-cell:hover { box-shadow: inset 0 0 0 2px #ffa8a8; }
+    .result-table td.cw-cell.marked { background: #fff5f5; color: #c92a2a; font-weight: 700; }
+    .cw-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .cw-chip { font-size: 0.78rem; border-radius: 4px; padding: 3px 9px; background: #fff5f5; color: #c92a2a; border: 1px solid #ffc9c9; cursor: pointer; }
+    .cw-chip:hover { background: #ffe3e3; }
     .pref-item .cant-work { color: #c92a2a; font-size: 0.78rem; margin-left: 10px; }
     .pref-weeks { display: flex; flex-wrap: wrap; gap: 4px; }
     .week-chip { font-size: 0.72rem; border-radius: 4px; padding: 2px 7px; background: #d3f9d8; color: #2b8a3e; white-space: nowrap; }
@@ -429,6 +437,15 @@
   <div class="pref-list" id="pref-list"><p class="empty-msg">Loading…</p></div>
 </div>
 
+<div class="card">
+  <div class="card-head">
+    <h2>Can't-Work Shifts</h2>
+    <span class="save-state" id="cw-save-state"></span>
+  </div>
+  <div class="results-note">Mark shifts a worker absolutely cannot work. They will never be scheduled there, even if they picked it, and autofill skips them. Only supervisors can see or change these.</div>
+  <div id="cw-body"></div>
+</div>
+
 <div class="action-row">
   <div class="tooltip-wrap">
     <button class="btn-run" id="run-btn" onclick="runSchedule()">Run Schedule</button>
@@ -477,6 +494,7 @@
   function incentiveClass(level) { return level === 2 ? " incentive2" : level === 1 ? " incentive" : ""; }
   const LEVEL_NAMES = ["off", "incentive pay", "double incentive pay"];
   let published = null;   // what workers currently see
+  let unavailable = {};   // { initials: { isoMonday: [[day, shift], ...] } } can't-work marks, supervisor only
   let preferences = [];   // [{ initials, weeks: { isoMonday: [[day, shift], ...] } }]
   let results = null;     // last run
 
@@ -933,6 +951,7 @@
       const data = await res.json();
       if (!res.ok) { showStatus(data?.detail || `Server error ${res.status}`, "error", statusEl); return; }
       published = data;
+      loadUnavailable();   // publishing drops marks for weeks no longer in the period
       updateBanner();
       showStatus("Schedule created. Workers can now pick their shifts.", "success", statusEl);
       loadPreferences();
@@ -956,6 +975,7 @@
       if (res.status === 401) { handleUnauthorized(); return; }
       if (!res.ok) { showStatus(`Server error ${res.status}`, "error", statusEl); return; }
       published = null;
+      renderCantWork();
       updateBanner();
       renderPreferences();
       showStatus("Schedule removed from the staff view.", "success", statusEl);
@@ -963,6 +983,101 @@
       showStatus(`Request failed: ${err.message}.`, "error", statusEl);
     } finally {
       btn.disabled = false;
+    }
+  }
+
+  // ── Can't-work shifts (supervisor sets them for each worker) ─────────────
+
+  let cwWorker = "";   // initials being edited
+  let cwWeek = "";     // ISO Monday being edited
+
+  async function loadUnavailable() {
+    const data = await fetchJSON("/unavailable", true);
+    if (data) unavailable = data;
+    renderCantWork();
+    renderPreferences();
+  }
+
+  function renderCantWork() {
+    const body = document.getElementById("cw-body");
+    if (!published) { body.innerHTML = '<p class="empty-msg">Create the schedule first.</p>'; return; }
+    const workers = published.workers.map(w => w.initials);
+    if (!workers.includes(cwWorker)) cwWorker = workers[0] || "";
+    if (!published.weeks.includes(cwWeek)) cwWeek = published.weeks[0] || "";
+
+    const controls = `<div class="cw-controls">
+      <div class="field-group"><label for="cw-worker">Worker</label>
+        <select id="cw-worker" onchange="cwWorker = this.value; renderCantWork()">
+          ${workers.map(i => `<option value="${i}"${i === cwWorker ? " selected" : ""}>${i}</option>`).join("")}
+        </select></div>
+      <div class="field-group"><label for="cw-week">Week</label>
+        <select id="cw-week" onchange="cwWeek = this.value; renderCantWork()">
+          ${published.weeks.map(w => `<option value="${w}"${w === cwWeek ? " selected" : ""}>Week of ${weekLabel(w)}</option>`).join("")}
+        </select></div>
+    </div>`;
+
+    const marks = (unavailable[cwWorker] || {})[cwWeek] || [];
+    const monday = parseISO(cwWeek);
+    let grid = `<div class="result-scroll"><table class="result-table">
+      <thead><tr><th>Shift</th>${DAY_LABELS.map((d, i) => `<th>${d} ${numericDate(addDays(monday, i))}</th>`).join("")}</tr></thead><tbody>`;
+    SHIFT_LABELS.forEach((label, si) => {
+      if (si === 1) return;   // 3am-6am goes with 12am-3am
+      grid += `<tr><td class="shift-label">${si === 0 ? "12am – 6am" : label}</td>`;
+      DAY_LABELS.forEach((_, di) => {
+        const on = marks.some(m => m[0] === di && m[1] === si);
+        grid += `<td class="cw-cell${on ? " marked" : ""}" onclick="toggleCantWork(${di}, ${si})" title="${on ? "Can't work — click to clear" : "Click to mark can't work"}">${on ? "✕" : "·"}</td>`;
+      });
+      grid += "</tr>";
+    });
+    grid += "</tbody></table></div>";
+
+    // Everyone with marks, so the supervisor can jump between them
+    const chips = workers.filter(i => unavailable[i]).map(i => {
+      const n = published.weeks.reduce((t, w) => t + ((unavailable[i] || {})[w] || []).length, 0);
+      return n ? `<span class="cw-chip" onclick="cwWorker='${i}'; renderCantWork()">${i}: ✕ ${n}</span>` : "";
+    }).join("");
+    const summary = chips ? `<div class="section-label" style="margin-top:14px">Workers with can't-work shifts</div><div class="cw-summary">${chips}</div>` : "";
+
+    body.innerHTML = controls + grid + summary;
+  }
+
+  let cwSaveSeq = 0;
+  async function toggleCantWork(di, si) {
+    if (!cwWorker || !cwWeek) return;
+    const initials = cwWorker;
+    const byWeek = { ...(unavailable[initials] || {}) };
+    const marks = (byWeek[cwWeek] || []).filter(m => !(m[0] === di && m[1] === si));
+    if (marks.length === (byWeek[cwWeek] || []).length) marks.push([di, si]);
+    if (marks.length) byWeek[cwWeek] = marks; else delete byWeek[cwWeek];
+    if (Object.keys(byWeek).length) unavailable[initials] = byWeek; else delete unavailable[initials];
+    renderCantWork();
+    renderPreferences();
+
+    const state = document.getElementById("cw-save-state");
+    state.textContent = "Saving…";
+    const seq = ++cwSaveSeq;
+    // Saves go out one at a time so a slow earlier save can't overwrite a later one
+    cwSaveChain = cwSaveChain.then(() => saveCantWork(initials, byWeek, seq));
+  }
+
+  let cwSaveChain = Promise.resolve();
+  async function saveCantWork(initials, byWeek, seq) {
+    const state = document.getElementById("cw-save-state");
+    try {
+      const res = await fetch(`/unavailable/${encodeURIComponent(initials)}`, {
+        method: "PUT", headers: authHeaders(), body: JSON.stringify({ weeks: byWeek })
+      });
+      if (res.status === 401) { handleUnauthorized(); return; }
+      if (seq !== cwSaveSeq) return;
+      if (!res.ok) {
+        let detail = `Server error ${res.status}`;
+        try { detail = (await res.json()).detail || detail; } catch {}
+        state.textContent = `Not saved: ${detail}`;
+        return;
+      }
+      state.textContent = "Saved";
+    } catch (err) {
+      if (seq === cwSaveSeq) state.textContent = `Not saved: ${err.message}`;
     }
   }
 
@@ -989,8 +1104,8 @@
           : `<span class="week-chip missing" title="Week of ${weekLabel(w)}">${label}: —</span>`;
       }).join("");
       const done = weeks.filter(w => (p.weeks[w] || []).length > 0).length;
-      const cantWork = weeks.reduce((n, w) => n + ((p.unavailable || {})[w] || []).length, 0);
-      const cantWorkNote = cantWork > 0 ? `<span class="cant-work" title="Shifts marked as can't work; never autofilled onto them">✕ ${cantWork} can't work</span>` : "";
+      const cantWork = weeks.reduce((n, w) => n + ((unavailable[p.initials] || {})[w] || []).length, 0);
+      const cantWorkNote = cantWork > 0 ? `<span class="cant-work" title="Shifts a supervisor marked as can't work">✕ ${cantWork} can't work</span>` : "";
       return `<div class="pref-item">
         <span><span class="initials">${p.initials}</span><span class="count">${done}/${weeks.length} weeks</span>${cantWorkNote}</span>
         <span class="pref-weeks">${chips}</span>
@@ -1009,7 +1124,7 @@
       if (res.status === 401) { handleUnauthorized(); return; }
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
-      const next = data.map(p => ({ initials: p.initials, weeks: p.weeks || {}, unavailable: p.unavailable || {} }));
+      const next = data.map(p => ({ initials: p.initials, weeks: p.weeks || {} }));
       const changed = JSON.stringify(next) !== JSON.stringify(preferences);
       preferences = next;
       if (changed || !quiet) renderPreferences();
@@ -1245,6 +1360,7 @@
     updateBanner();
     renderResults();
     await loadPreferences();
+    await loadUnavailable();
     try {
       const savedTab = sessionStorage.getItem("adminTab");
       if (savedTab && savedTab !== "create") showTab(savedTab);

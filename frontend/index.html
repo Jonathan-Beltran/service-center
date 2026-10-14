@@ -144,41 +144,6 @@
       line-height: 1.4;
     }
 
-    .shift.blocked {
-      background: #fff5f5;
-      color: #c92a2a;
-      border-color: #ffa8a8;
-      text-decoration: line-through;
-    }
-    .shift.blocked:hover { background: #ffe3e3; }
-    .block-badge {
-      position: absolute;
-      top: 5px;
-      right: 7px;
-      font-size: 0.7rem;
-      font-weight: 700;
-      color: #c92a2a;
-      line-height: 1.4;
-    }
-
-    /* Pick / can't-work mode switch */
-    .mode-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-    .mode-switch { display: inline-flex; background: #e9ecef; border-radius: 8px; padding: 3px; }
-    .mode-btn {
-      padding: 7px 14px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: #555;
-      background: none;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    .mode-btn.active { background: white; color: #3b5bdb; box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
-    .mode-btn.block.active { color: #c92a2a; }
-    .mode-help { font-size: 0.82rem; color: #666; }
-    #week.blocking .shift:not(.blocked):hover { background: #fff5f5; border-color: #ffc9c9; }
-
     .hint {
       font-size: 0.82rem;
       color: #666;
@@ -292,8 +257,6 @@
 
       .shift { padding: 11px 12px; font-size: 0.85rem; margin-bottom: 8px; }
 
-      .mode-switch { width: 100%; }
-      .mode-btn { flex: 1; }
       .submit-btn, .clear-btn { flex: 1; padding: 11px; font-size: 0.9rem; text-align: center; }
     }
   </style>
@@ -312,13 +275,6 @@
   <div class="notice" id="notice" style="display:none"></div>
 
   <div id="picker">
-    <div class="mode-row">
-      <div class="mode-switch" role="group" aria-label="Click mode">
-        <button class="mode-btn active" id="mode-pick" aria-pressed="true" onclick="setMode('pick')">Pick shifts</button>
-        <button class="mode-btn block" id="mode-block" aria-pressed="false" onclick="setMode('block')">✕ Can't work</button>
-      </div>
-      <span class="mode-help" id="mode-help">Click shifts in order of preference.</span>
-    </div>
     <div class="day-tabs" id="day-tabs"></div>
     <div class="week no-user" id="week"></div>
   </div>
@@ -358,8 +314,6 @@
     let weeks = [];          // ISO dates of each Monday, from the server
     let activeWeek = null;   // ISO date of the week being edited
     let selections = {};     // week -> ordered list of [dayIndex, shiftIndex]
-    let blocked = {};        // week -> [[dayIndex, shiftIndex], ...] the worker cannot work
-    let mode = "pick";       // "pick" or "block": what clicking a shift does
     let currentUser = "";
 
     // ── Date helpers ────────────────────────────────────────────────────────
@@ -388,24 +342,6 @@
       return `${shortDate(start)} – ${shortDate(addDays(start, 6))}`;
     }
 
-    function currentBlocked() {
-      if (!activeWeek) return [];
-      if (!blocked[activeWeek]) blocked[activeWeek] = [];
-      return blocked[activeWeek];
-    }
-
-    function setMode(next) {
-      mode = next;
-      document.getElementById("mode-pick").classList.toggle("active", mode === "pick");
-      document.getElementById("mode-block").classList.toggle("active", mode === "block");
-      document.getElementById("mode-pick").setAttribute("aria-pressed", mode === "pick");
-      document.getElementById("mode-block").setAttribute("aria-pressed", mode === "block");
-      document.getElementById("week").classList.toggle("blocking", mode === "block");
-      document.getElementById("mode-help").textContent = mode === "pick"
-        ? "Click shifts in order of preference."
-        : "Please click shifts you absolutely cannot work.";
-    }
-
     function currentPicks() {
       if (!activeWeek) return [];
       if (!selections[activeWeek]) selections[activeWeek] = [];
@@ -429,7 +365,7 @@
 
     function updateClearButton() {
       const btn = document.getElementById("clear-btn");
-      const n = activeWeek ? (selections[activeWeek] || []).length + (blocked[activeWeek] || []).length : 0;
+      const n = activeWeek ? (selections[activeWeek] || []).length : 0;
       btn.textContent = activeWeek ? `Clear week of ${shortDate(parseISO(activeWeek))}` : "Clear this week";
       btn.disabled = !currentUser || n === 0;
     }
@@ -442,7 +378,6 @@
 
       const monday = parseISO(activeWeek);
       const picks = currentPicks();
-      const cantWork = currentBlocked();
 
       days.forEach((day, dayIndex) => {
         const dayEl = document.createElement("div");
@@ -454,13 +389,10 @@
           const rank = picks.findIndex(s => s[0] === dayIndex && s[1] === shiftIndex);
           const isSelected = rank !== -1;
 
-          const isBlocked = cantWork.some(s => s[0] === dayIndex && s[1] === shiftIndex);
-
           const shiftEl = document.createElement("div");
           const lvl = incentiveLevel(activeWeek, dayIndex, shiftIndex);
-          shiftEl.className = "shift" + (isSelected ? " selected" : "") + (isBlocked ? " blocked" : "")
-            + (!isBlocked && lvl === 2 ? " incentive2" : !isBlocked && lvl === 1 ? " incentive" : "");
-          shiftEl.innerHTML = `${shift}${isSelected ? `<span class="rank-badge">${rank + 1}</span>` : ""}${isBlocked ? `<span class="block-badge" title="Can't work">✕</span>` : ""}`;
+          shiftEl.className = "shift" + (isSelected ? " selected" : "") + (lvl === 2 ? " incentive2" : lvl === 1 ? " incentive" : "");
+          shiftEl.innerHTML = `${shift}${isSelected ? `<span class="rank-badge">${rank + 1}</span>` : ""}`;
           shiftEl.onclick = () => toggleShift(dayIndex, shiftIndex);
 
           dayEl.appendChild(shiftEl);
@@ -500,32 +432,20 @@
     function clearWeek() {
       if (!currentUser || !activeWeek) return;
       const picks = currentPicks();
-      const cantWork = currentBlocked();
-      if (picks.length === 0 && cantWork.length === 0) return;
-      const parts = [];
-      if (picks.length) parts.push(`${picks.length} pick${picks.length !== 1 ? "s" : ""}`);
-      if (cantWork.length) parts.push(`${cantWork.length} can't-work mark${cantWork.length !== 1 ? "s" : ""}`);
-      if (!confirm(`Clear ${parts.join(" and ")} for the week of ${weekLabel(activeWeek)}?`)) return;
+      if (picks.length === 0) return;
+      if (!confirm(`Clear all ${picks.length} pick${picks.length !== 1 ? "s" : ""} for the week of ${weekLabel(activeWeek)}?`)) return;
       selections[activeWeek] = [];
-      blocked[activeWeek] = [];
       renderWeekTabs();
       renderWeek();
     }
 
-    // In pick mode a click ranks/unranks the shift; in can't-work mode it
-    // marks/unmarks it. A shift is never both, so each mode clears the other.
     function toggleShift(dayIndex, shiftIndex) {
       const picks = currentPicks();
-      const cantWork = currentBlocked();
-      const same = s => s[0] === dayIndex && s[1] === shiftIndex;
-      const [mine, other] = mode === "pick" ? [picks, cantWork] : [cantWork, picks];
-      const idx = mine.findIndex(same);
+      const idx = picks.findIndex(s => s[0] === dayIndex && s[1] === shiftIndex);
       if (idx !== -1) {
-        mine.splice(idx, 1);
+        picks.splice(idx, 1);
       } else {
-        mine.push([dayIndex, shiftIndex]);
-        const otherIdx = other.findIndex(same);
-        if (otherIdx !== -1) other.splice(otherIdx, 1);
+        picks.push([dayIndex, shiftIndex]);
       }
       renderWeekTabs();
       renderWeek();
@@ -537,8 +457,7 @@
       if (!currentUser || weeks.length === 0) return;
 
       const emptyWeeks = weeks.filter(w => (selections[w] || []).length === 0);
-      const anyBlocked = weeks.some(w => (blocked[w] || []).length > 0);
-      if (emptyWeeks.length === weeks.length && !anyBlocked) {
+      if (emptyWeeks.length === weeks.length) {
         alert("Select at least one shift before submitting.");
         return;
       }
@@ -553,11 +472,8 @@
       btn.textContent = "Submitting…";
       statusEl.style.display = "none";
 
-      const payload = { initials: currentUser, weeks: {}, unavailable: {} };
-      weeks.forEach(w => {
-        payload.weeks[w] = selections[w] || [];
-        payload.unavailable[w] = blocked[w] || [];
-      });
+      const payload = { initials: currentUser, weeks: {} };
+      weeks.forEach(w => { payload.weeks[w] = selections[w] || []; });
 
       try {
         const res = await fetch("/submit_preference", {
@@ -585,16 +501,12 @@
 
     async function loadExistingSelections(initials) {
       selections = {};
-      blocked = {};
       try {
         const res = await fetch(`/preferences/${encodeURIComponent(initials)}`);
         if (!res.ok) return;
         const data = await res.json();
         Object.entries(data.weeks || {}).forEach(([w, times]) => {
           if (weeks.includes(w)) selections[w] = times;
-        });
-        Object.entries(data.unavailable || {}).forEach(([w, times]) => {
-          if (weeks.includes(w)) blocked[w] = times;
         });
       } catch { /* start fresh */ }
     }
@@ -612,7 +524,6 @@
         week.classList.remove("no-user");
       } else {
         selections = {};
-        blocked = {};
         week.classList.add("no-user");
       }
       renderWeekTabs();
@@ -671,11 +582,9 @@
         } else if (currentUser) {
           currentUser = "";
           selections = {};
-          blocked = {};
           document.getElementById("week").classList.add("no-user");
         }
         Object.keys(selections).forEach(w => { if (!weeks.includes(w)) delete selections[w]; });
-        Object.keys(blocked).forEach(w => { if (!weeks.includes(w)) delete blocked[w]; });
       }
 
       if (weeks.length === 0) {

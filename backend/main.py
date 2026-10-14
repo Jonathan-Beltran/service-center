@@ -70,7 +70,8 @@ def admin_login(body: LoginRequest):
 #   "draft":          setup being edited on the Create Schedule tab (supervisor only)
 #   "published":      setup workers see, plus "created_at"; None until Create Schedule
 #   "preferences":    {"HM": {"2026-09-21": [[day, shift], ...], ...}, ...}
-#   "unavailable":    same shape; shifts a worker cannot work, never autofilled onto them
+#   "unavailable":    same shape; shifts a worker cannot work, set by supervisors only.
+#                     They are never scheduled there, by their own picks or by autofill
 #   "results":        last run of the algorithm, supervisor only:
 #                     {"id", "run_at", "yellows", "submitted", "weeks": [...], "setup": published setup it ran on}
 #   "runs":           every run, oldest first, same shape as "results" (the History tab)
@@ -293,8 +294,7 @@ def get_published():
 
 class PreferenceSubmission(BaseModel):
     initials: str
-    weeks: Dict[str, List[List[int]]]                 # ISO Monday -> ordered [[day, shift], ...]
-    unavailable: Dict[str, List[List[int]]] = {}      # ISO Monday -> [[day, shift], ...] they cannot work
+    weeks: Dict[str, List[List[int]]]   # ISO Monday -> ordered [[day, shift], ...]
 
 def _clean_shift_lists(by_week: Dict[str, List[List[int]]], open_weeks: set) -> Dict[str, List[List[int]]]:
     cleaned: Dict[str, List[List[int]]] = {}
@@ -328,38 +328,28 @@ def submit_preference(pref: PreferenceSubmission):
 
     open_weeks = set(pub["weeks"])
     cleaned = _clean_shift_lists(pref.weeks, open_weeks)
-    blocked = _clean_shift_lists(pref.unavailable, open_weeks)
-    # A shift cannot be both picked and blocked; the pick wins
-    for week in list(blocked):
-        picked = cleaned.get(week, [])
-        blocked[week] = [t for t in blocked[week] if t not in picked]
-        if not blocked[week]:
-            del blocked[week]
 
     with store_lock:
         _set_or_drop(store["preferences"], initials, cleaned)
-        _set_or_drop(store["unavailable"], initials, blocked)
         save_store()
     return {"status": "ok"}
 
 @app.get("/preferences/{initials}")
 def get_preference(initials: str):
     key = initials.strip().upper()
-    return {"initials": key, "weeks": store["preferences"].get(key, {}), "unavailable": store["unavailable"].get(key, {})}
+    return {"initials": key, "weeks": store["preferences"].get(key, {})}
 
 @app.get("/preferences", dependencies=[Depends(require_auth)])
 def get_preferences():
-    keys = list(store["preferences"]) + [k for k in store["unavailable"] if k not in store["preferences"]]
-    return [{"initials": k, "weeks": store["preferences"].get(k, {}), "unavailable": store["unavailable"].get(k, {})} for k in keys]
+    return [{"initials": k, "weeks": v} for k, v in store["preferences"].items()]
 
 @app.delete("/preferences/{initials}", dependencies=[Depends(require_auth)])
 def delete_preference(initials: str):
     key = initials.strip().upper()
     with store_lock:
-        if key not in store["preferences"] and key not in store["unavailable"]:
+        if key not in store["preferences"]:
             raise HTTPException(status_code=404, detail="Not found")
-        store["preferences"].pop(key, None)
-        store["unavailable"].pop(key, None)
+        del store["preferences"][key]
         save_store()
     return {"status": "ok"}
 
@@ -367,9 +357,31 @@ def delete_preference(initials: str):
 def clear_preferences():
     with store_lock:
         store["preferences"] = {}
-        store["unavailable"] = {}
         save_store()
     return {"status": "ok"}
+
+# ── Can't-work shifts (supervisor only) ───────────────────────────────────────
+
+class UnavailableUpdate(BaseModel):
+    weeks: Dict[str, List[List[int]]]   # ISO Monday -> [[day, shift], ...]; replaces that worker's marks
+
+@app.get("/unavailable", dependencies=[Depends(require_auth)])
+def get_unavailable():
+    return store["unavailable"]
+
+@app.put("/unavailable/{initials}", dependencies=[Depends(require_auth)])
+def put_unavailable(initials: str, body: UnavailableUpdate):
+    key = initials.strip().upper()
+    pub = store["published"]
+    if not pub:
+        raise HTTPException(status_code=400, detail="Create the schedule first")
+    if key not in {w["initials"] for w in pub["workers"]}:
+        raise HTTPException(status_code=400, detail=f"{key} is not on the worker list")
+    cleaned = _clean_shift_lists(body.weeks, set(pub["weeks"]))
+    with store_lock:
+        _set_or_drop(store["unavailable"], key, cleaned)
+        save_store()
+    return {"initials": key, "weeks": cleaned}
 
 # ── Run the algorithm ─────────────────────────────────────────────────────────
 
@@ -386,11 +398,14 @@ def run_schedule():
 
     results = []
     for week in pub["weeks"]:
+        cant_work = {i: by_week[week] for i, by_week in store["unavailable"].items() if by_week.get(week)}
+        # A supervisor's can't-work mark overrides the worker's own pick
         entries = [
-            (initials, by_week[week])
+            (initials, [t for t in by_week[week] if t not in cant_work.get(initials, [])])
             for initials, by_week in store["preferences"].items()
             if by_week.get(week)
         ]
+        entries = [e for e in entries if e[1]]
         entries.sort(key=lambda e: priority_by_initials.get(e[0], 0), reverse=True)
 
         data = {
@@ -399,7 +414,7 @@ def run_schedule():
             "selected_times": [e[1] for e in entries],
             "doubles": [e[0] in doubles_recipients for e in entries],
             "all_workers": [(w["initials"], w["points"]) for w in pub["workers"]],
-            "unavailable": {i: by_week[week] for i, by_week in store["unavailable"].items() if by_week.get(week)},
+            "unavailable": cant_work,
         }
         # schedule() mutates its inputs, so hand it fresh copies per week
         days = {
@@ -492,7 +507,7 @@ def download_run(run_id: str):
 @app.middleware("http")
 async def no_cache_static(request, call_next):
     response = await call_next(request)
-    if not request.url.path.startswith(("/admin/", "/draft", "/publish", "/published", "/preferences", "/runs",
+    if not request.url.path.startswith(("/admin/", "/draft", "/publish", "/published", "/preferences", "/runs", "/unavailable",
                                         "/submit_preference", "/run_schedule", "/results")):
         response.headers["Cache-Control"] = "no-cache"
     return response

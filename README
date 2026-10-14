@@ -27,16 +27,17 @@ How scheduling works
      note goes in the Excel notes row. Pressing
      "Create Schedule" publishes it. Workers can then open index.html, pick
      their initials, and rank shifts for each week. Coming back later reloads
-     what they already submitted. Switching to "Can't work" lets a worker
-     mark shifts they absolutely cannot work; autofill never assigns those to
-     them. Pressing Create Schedule again re-publishes
+     what they already submitted. Pressing Create Schedule again re-publishes
      the draft; submissions for weeks no longer in the period are deleted.
      "Remove from Staff View" takes the schedule down so workers see nothing.
      The draft and submitted shifts are kept; Create Schedule posts it again.
-  3. Run Schedule: shows who has submitted, runs the algorithm on the published
-     schedule, and shows the result. Workers never see it in the app;
-     "Download Excel" produces a workbook (one sheet per week, laid out from
-     backend/template.xlsx) for the supervisor to share.
+  3. Run Schedule: shows who has submitted, lets supervisors mark shifts a
+     worker absolutely cannot work (they are never scheduled there, by their
+     own picks or by autofill; workers don't see these marks), runs the
+     algorithm on the published schedule, and shows the result. Workers
+     never see it in the app; "Download Excel" produces a workbook (one
+     sheet per week, laid out from backend/template.xlsx) for the supervisor
+     to share.
   4. History: every time the schedule was run, newest first, with the date
      it ran, the period and whether every seat was filled. Each run can be
      viewed again or downloaded as Excel; it keeps the settings it ran with,
