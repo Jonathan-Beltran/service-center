@@ -268,7 +268,7 @@
 
 <div class="tabs">
   <button class="tab active" data-tab="create" onclick="showTab('create')">Create Schedule</button>
-  <button class="tab" data-tab="preview" onclick="showTab('preview')">Preview Schedule</button>
+  <button class="tab" data-tab="preview" onclick="showTab('preview')">Publish Schedule</button>
   <button class="tab" data-tab="run" onclick="showTab('run')">Run Schedule</button>
   <button class="tab" data-tab="history" onclick="showTab('history')">History</button>
 </div>
@@ -343,7 +343,7 @@
   </div>
 </div>
 
-<div class="help-text">Nothing on this tab is visible to workers until you press <strong>Create Schedule</strong> on the Preview Schedule tab.</div>
+<div class="help-text">Nothing on this tab is visible to workers until you press <strong>Publish Schedule</strong> on the Publish Schedule tab.</div>
 
 </div><!-- /tab-create -->
 
@@ -365,8 +365,8 @@
 
 <div class="action-row">
   <div class="tooltip-wrap">
-    <button class="btn-run" id="create-btn" onclick="createSchedule()" title="This creates the schedule for everyone.">Create Schedule</button>
-    <span class="tooltip" role="tooltip">This creates the schedule, and releases it for everyone.</span>
+    <button class="btn-run" id="create-btn" onclick="createSchedule()" title="This creates the schedule for everyone.">Publish Schedule</button>
+    <span class="tooltip" role="tooltip">This publishes the schedule for everyone.</span>
   </div>
   <button class="btn btn-danger" id="unpublish-btn" onclick="unpublishSchedule()" hidden>Remove from Staff View</button>
   <div class="action-info" id="create-info"></div>
@@ -747,10 +747,10 @@
     const el = document.getElementById("banner");
     if (!published) {
       el.className = "banner none";
-      el.innerHTML = `No schedule is posted to staff. Workers see nothing until you press Create Schedule on the Preview Schedule tab.`;
+      el.innerHTML = `No schedule is posted to staff. Workers see nothing until you press Publish Schedule on the Preview Schedule tab.`;
     } else if (setupsDiffer(draft, published)) {
       el.className = "banner draft";
-      el.innerHTML = `You have unpublished changes. Workers still see the schedule created <strong>${fmtStamp(published.created_at)}</strong>. Press Create Schedule on the Preview Schedule tab to apply them.`;
+      el.innerHTML = `You have unpublished changes. Workers still see the schedule created <strong>${fmtStamp(published.created_at)}</strong>. Press Publish Schedule on the Preview Schedule tab to apply them.`;
     } else {
       el.className = "banner live";
       el.innerHTML = `Schedule is live. Created <strong>${fmtStamp(published.created_at)}</strong>, ${published.weeks.length} week${published.weeks.length !== 1 ? "s" : ""}, ${published.workers.length} workers.`;
@@ -758,7 +758,7 @@
     const info = document.getElementById("create-info");
     info.innerHTML = published
       ? `Workers currently see the schedule created <strong>${fmtStamp(published.created_at)}</strong>.` + (setupsDiffer(draft, published) ? " The preview above differs from it." : " The preview above matches it.")
-      : "Workers cannot see anything until you create the schedule.";
+      : "Workers cannot see anything until you publish the schedule.";
     document.getElementById("unpublish-btn").hidden = !published;
   }
 
@@ -962,7 +962,7 @@
       showStatus(`Request failed: ${err.message}.`, "error", statusEl);
     } finally {
       btn.disabled = false;
-      btn.textContent = "Create Schedule";
+      btn.textContent = "Publish Schedule";
     }
   }
 
