@@ -326,11 +326,12 @@
         <th>Initials</th>
         <th>Priority Points</th>
         <th style="text-align:center">Doubles</th>
+        <th style="text-align:center" title="Absent workers are scheduled after everyone else, ordered among themselves by priority points">Absent</th>
         <th></th>
       </tr>
     </thead>
     <tbody id="workers-tbody">
-      <tr id="workers-empty-row"><td colspan="4" class="empty-msg" style="padding:12px 10px">No workers added yet.</td></tr>
+      <tr id="workers-empty-row"><td colspan="5" class="empty-msg" style="padding:12px 10px">No workers added yet.</td></tr>
     </tbody>
   </table>
   <hr class="divider">
@@ -694,6 +695,7 @@
         <td><strong>${w.initials}</strong></td>
         <td>${w.points.toLocaleString()}</td>
         <td class="center"><input type="checkbox" ${w.doubles ? "checked" : ""} onchange="toggleDoubles(${i}, this.checked)" style="width:16px;height:16px;cursor:pointer;"></td>
+        <td class="center"><input type="checkbox" ${w.absent ? "checked" : ""} onchange="toggleAbsent(${i}, this.checked)" style="width:16px;height:16px;cursor:pointer;" aria-label="${w.initials} absent"></td>
         <td><button class="btn btn-danger sm" onclick="removeWorker(${i})">Remove</button></td>`;
       tbody.appendChild(tr);
     });
@@ -701,6 +703,7 @@
 
   function removeWorker(index) { draft.workers.splice(index, 1); renderWorkers(); scheduleDraftSave(); }
   function toggleDoubles(index, value) { draft.workers[index].doubles = value; scheduleDraftSave(); }
+  function toggleAbsent(index, value) { draft.workers[index].absent = value; scheduleDraftSave(); }
 
   function clearWorkers() {
     if (draft.workers.length === 0) return;
@@ -722,7 +725,7 @@
       const points = parseFloat(parts[1]);
       if (!initials || isNaN(points)) return;
       if (draft.workers.find(w => w.initials === initials)) { skipped++; return; }
-      draft.workers.push({ initials, points, doubles: false });
+      draft.workers.push({ initials, points, doubles: false, absent: false });
       added++;
     });
     renderWorkers();

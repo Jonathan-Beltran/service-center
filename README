@@ -15,6 +15,9 @@ How scheduling works
   1. Create Schedule: set the period (start and end dates), shift sizes, and
      import workers. This is a draft. It saves as you type, but workers see
      none of it.
+     Marking a worker "Absent" moves them to the bottom of the scheduling
+     order, below the lowest priority-point holder; absent workers are
+     ordered among themselves by priority points.
      "Autofill Empty Shifts" (on by default): when workers' picks leave
      required seats empty, each one goes to the worker with the fewest shifts
      that week, lowest priority points breaking ties. Forced seats show as

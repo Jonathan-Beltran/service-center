@@ -1,16 +1,23 @@
 from collections import deque
 
+def rank_key(points, absent):
+    """Scheduling order: everyone present by priority points (highest first),
+    then everyone marked absent, also by priority points."""
+    return (bool(absent), -points)
+
 def schedule(data, days):
+    absent = data.get("absent") or [False] * len(data["names"])
     users = []
     for index, name in enumerate(data["names"]):
         users.append([
             name,
             data["priority_points"][index],
             deque(data["selected_times"][index]),
-            data["doubles"][index]
+            data["doubles"][index],
+            absent[index],
         ])
 
-    users.sort(key=lambda x: x[1], reverse=True)
+    users.sort(key=lambda x: rank_key(x[1], x[4]))
 
     # Per-day capacities and yellows. Weekdays/weekends are the defaults;
     # days["overrides"] = {day_index: {"caps": [8 ints], "yellows": bool}}
@@ -130,13 +137,15 @@ def schedule(data, days):
 
     # ── Autofill (optional) ──────────────────────────────────────────────────
     # Seats nobody picked are forced onto workers: fewest shifts this week
-    # first, then lowest priority points. Every worker on the list is eligible,
+    # first, then lowest ranking (absent workers rank lowest, then by priority
+    # points, lowest first). Every worker on the list is eligible,
     # including those who did not submit picks for this week, except for
     # shifts they marked as unable to work (data["unavailable"]).
 
     forced = []   # [[day, shift, name], ...]
     if days.get("autofill") and num_required_shifts > 0:
-        pool = data.get("all_workers") or [(user[0], user[1]) for user in users]
+        # (initials, points, absent)
+        pool = data.get("all_workers") or [(user[0], user[1], user[4]) for user in users]
         blocked = {(name, d, s) for name, cells in (data.get("unavailable") or {}).items() for d, s in cells}
 
         def shift_count(name):
@@ -154,7 +163,8 @@ def schedule(data, days):
                                   and not (shift_i == 0 and w[0] in schedule_grid[day_i][1])]
                     if not candidates:
                         break
-                    name = min(candidates, key=lambda w: (shift_count(w[0]), w[1]))[0]
+                    # Lowest ranking first: absent workers, then fewest priority points
+                    name = min(candidates, key=lambda w: (shift_count(w[0]), not (len(w) > 2 and w[2]), w[1]))[0]
                     schedule_grid[day_i][shift_i].append(name)
                     forced.append([day_i, shift_i, name])
                     # A forced grave carries its 3am-6am half with it

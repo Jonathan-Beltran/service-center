@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
-from schedule import schedule
+from schedule import schedule, rank_key
 from export_xlsx import build_workbook
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -61,7 +61,7 @@ def admin_login(body: LoginRequest):
 #   start/end  ISO dates chosen by the supervisor
 #   weeks      ISO date of every Monday in that range (computed)
 #   settings   {"weekdays": [8 ints], "weekends": [8 ints], "yellows": bool, "autofill": bool}
-#   workers    [{"initials", "points", "doubles"}, ...]
+#   workers    [{"initials", "points", "doubles", "absent"}, ...]   absent workers go to the bottom of the order
 #   incentives {"2026-09-21": [[day, shift, level], ...]}   level 1 = incentive pay, 2 = double incentive
 #   overrides  {"2026-09-21": {"0": {"caps": [8 ints], "yellows": bool, "note": str}}}
 #              per-day shift sizes that replace settings for that one day (holidays etc.)
@@ -142,6 +142,7 @@ class WorkerEntry(BaseModel):
     initials: str
     points: float
     doubles: bool
+    absent: bool = False
 
 class DayOverride(BaseModel):
     caps: List[int]
@@ -184,7 +185,7 @@ def _build_setup(body: SetupRequest) -> dict:
         if not initials or initials in seen:
             continue
         seen.add(initials)
-        workers.append({"initials": initials, "points": w.points, "doubles": w.doubles})
+        workers.append({"initials": initials, "points": w.points, "doubles": w.doubles, "absent": w.absent})
 
     weeks = _weeks_between(body.start, body.end)
     incentives: Dict[str, List[List[int]]] = {}
@@ -395,6 +396,7 @@ def run_schedule():
     settings = pub["settings"]
     priority_by_initials = {w["initials"]: w["points"] for w in pub["workers"]}
     doubles_recipients = {w["initials"] for w in pub["workers"] if w["doubles"]}
+    absentees = {w["initials"] for w in pub["workers"] if w.get("absent")}
 
     results = []
     for week in pub["weeks"]:
@@ -406,14 +408,15 @@ def run_schedule():
             if by_week.get(week)
         ]
         entries = [e for e in entries if e[1]]
-        entries.sort(key=lambda e: priority_by_initials.get(e[0], 0), reverse=True)
+        entries.sort(key=lambda e: rank_key(priority_by_initials.get(e[0], 0), e[0] in absentees))
 
         data = {
             "names": [e[0] for e in entries],
             "priority_points": [priority_by_initials.get(e[0], 0) for e in entries],
             "selected_times": [e[1] for e in entries],
             "doubles": [e[0] in doubles_recipients for e in entries],
-            "all_workers": [(w["initials"], w["points"]) for w in pub["workers"]],
+            "absent": [e[0] in absentees for e in entries],
+            "all_workers": [(w["initials"], w["points"], w["initials"] in absentees) for w in pub["workers"]],
             "unavailable": cant_work,
         }
         # schedule() mutates its inputs, so hand it fresh copies per week
