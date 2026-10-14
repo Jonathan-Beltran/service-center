@@ -40,8 +40,8 @@ How scheduling works
      to share.
   4. History: every time the schedule was run, newest first, with the date
      it ran, the period and whether every seat was filled. Each run can be
-     viewed again or downloaded as Excel; it keeps the settings it ran with,
-     so later changes to the schedule don't alter it. The last 200 runs are
+     viewed again, downloaded as Excel, or deleted; it keeps the settings it
+     ran with, so later changes to the schedule don't alter it. The last 200 runs are
      kept in the same JSON file.
 
 Persistence

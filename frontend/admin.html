@@ -1302,6 +1302,7 @@
         <td><div class="history-actions">
           <button class="btn btn-ghost" onclick="viewRun('${r.id}')">View</button>
           <button class="btn btn-primary" onclick="downloadRun('${r.id}', this)">Download Excel</button>
+          <button class="btn btn-danger" data-label="${fmtStamp(r.run_at)}" onclick="deleteRun('${r.id}', this)">Delete</button>
         </div></td>
       </tr>`;
     }).join("");
@@ -1337,6 +1338,36 @@
 
   function downloadRun(id, btn) {
     return downloadXlsx(`/runs/${id}/excel`, btn, document.getElementById("history-status"));
+  }
+
+  async function deleteRun(id, btn) {
+    const statusEl = document.getElementById("history-status");
+    statusEl.className = "status";
+    if (!confirm(`Delete the run from ${btn.dataset.label}?\n\nIt will be removed from the history for good. This does not change the posted schedule or anyone's submitted shifts.`)) return;
+    btn.disabled = true;
+    try {
+      const res = await fetch(`/runs/${id}`, { method: "DELETE", headers: authHeaders() });
+      if (res.status === 401) { handleUnauthorized(); return; }
+      if (!res.ok) {
+        let detail = `Server error ${res.status}`;
+        try { detail = (await res.json()).detail || detail; } catch {}
+        showStatus(detail, "error", statusEl);
+        btn.disabled = false;
+        return;
+      }
+      if (viewingRunId === id) closeRunView();
+      // The Run Schedule tab shows the latest run; it may have just changed
+      if (results && results.id === id) {
+        const latest = await fetchJSON("/results", true);
+        results = latest && latest.run_at ? latest : null;
+        renderResults();
+      }
+      showStatus(`Deleted the run from ${btn.dataset.label}.`, "success", statusEl);
+      loadHistory();
+    } catch (err) {
+      showStatus(`Request failed: ${err.message}.`, "error", statusEl);
+      btn.disabled = false;
+    }
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────

@@ -502,6 +502,18 @@ def get_run(run_id: str):
 def download_run(run_id: str):
     return _xlsx_response(_find_run(run_id))
 
+@app.delete("/runs/{run_id}", dependencies=[Depends(require_auth)])
+def delete_run(run_id: str):
+    """Remove a run from the history. If it was the latest run, the Run Schedule
+    tab falls back to the run before it (or to nothing)."""
+    with store_lock:
+        run = _find_run(run_id)
+        store["runs"].remove(run)
+        if store["results"] and store["results"].get("id") == run_id:
+            store["results"] = store["runs"][-1] if store["runs"] else None
+        save_store()
+    return {"status": "ok"}
+
 # The pages are plain files that change on every deploy. Tell browsers to
 # re-check them on each load so nobody runs a stale copy against a new API.
 @app.middleware("http")
