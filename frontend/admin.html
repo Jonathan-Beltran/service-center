@@ -361,12 +361,12 @@
 
 <div class="card">
   <h2>Schedule Preview</h2>
-  <div class="results-note">This is the preview of the schedule, built from the options you select from the Create Schedule tab. <b>Click or drag to mark shifts as incentive pay.</b> Click a day's name to change the shift sizes or yellows for just that day (holidays etc.).</div>
+  <div class="results-note">This is the preview of the schedule, built from the options you select from the Create Schedule tab. <b>Click or drag to mark shifts as incentive pay: once for +$1, twice for +$4.</b> Click a day's name to change the shift sizes or yellows for just that day (holidays etc.).</div>
   <div class="legend" id="preview-legend">
     <span><span class="slot"></span> Required slot</span>
     <span id="legend-yellow"><span class="slot yellow"></span> Yellow (optional extra) slot</span>
-    <span><span class="swatch"></span> Incentive pay</span>
-    <span><span class="swatch double"></span> Extra incentive pay</span>
+    <span><span class="swatch"></span> +$1</span>
+    <span><span class="swatch double"></span> +$4</span>
     <span><span class="swatch edited"></span> Day with its own shift sizes</span>
   </div>
   <div id="preview-grid"></div>
@@ -487,13 +487,13 @@
     return { caps: di <= 4 ? s.weekdays : s.weekends, yellows: !!s.yellows && di <= 4, note: "", edited: false };
   }
 
-  // 0 = none, 1 = incentive pay, 2 = double incentive pay
+  // 0 = none, 1 = +$1 incentive pay, 2 = +$4 incentive pay
   function incentiveLevel(setup, week, di, si) {
     const c = setup && setup.incentives && (setup.incentives[week] || []).find(c => c[0] === di && c[1] === si);
     return c ? (c[2] || 1) : 0;
   }
   function incentiveClass(level) { return level === 2 ? " incentive2" : level === 1 ? " incentive" : ""; }
-  const LEVEL_NAMES = ["off", "incentive pay", "double incentive pay"];
+  const LEVEL_NAMES = ["no incentive", "+$1", "+$4"];
   let published = null;   // what workers currently see
   let unavailable = {};   // { initials: { isoMonday: [[day, shift], ...] } } can't-work marks, supervisor only
   let preferences = [];   // [{ initials, weeks: { isoMonday: [[day, shift], ...] } }]
