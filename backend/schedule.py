@@ -189,20 +189,27 @@ def schedule(data, days):
         return {"error": True, "unfilled": unfilled, "schedule": schedule_grid, "forced": forced}
 
     # ── Yellow slots (optional extra seats) ──────────────────────────────────
+    # Handed out in rounds, one yellow per person per turn: going down the
+    # scheduling order, each worker takes their highest-ranked yellow pick that
+    # is still open. Rounds repeat until no one who wants a yellow can get one.
     # Use original_prefs so preferences popped during the main loop aren't lost.
-    # Fill in priority order; stop each slot once capacity is reached.
 
-    for day_i in range(7):
-        for shift_i in (3, 4, 5):
-            if not is_yellow(day_i, shift_i):
-                continue
-            cap = caps_by_day[day_i][shift_i]
-            for user in users:
-                if len(schedule_grid[day_i][shift_i]) >= cap:
-                    break
-                username = user[0]
-                wanted = any(p[0] == day_i and p[1] == shift_i for p in original_prefs[username])
-                if wanted and username not in schedule_grid[day_i][shift_i]:
-                    schedule_grid[day_i][shift_i].append(username)
+    yellow_wants = {
+        user[0]: [(d, s) for d, s in original_prefs[user[0]] if is_yellow(d, s)]
+        for user in users
+    }
+    while True:
+        took_any = False
+        for user in users:
+            username = user[0]
+            for d, s in yellow_wants[username]:
+                seat = schedule_grid[d][s]
+                if len(seat) < caps_by_day[d][s] and username not in seat:
+                    seat.append(username)
+                    yellow_wants[username].remove((d, s))
+                    took_any = True
+                    break   # one yellow per turn
+        if not took_any:
+            break
 
     return {"error": False, "unfilled": [], "schedule": schedule_grid, "forced": forced}

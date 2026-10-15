@@ -26,6 +26,10 @@ How scheduling works
      required seats empty, each one goes to the worker with the fewest shifts
      that week, lowest ranking breaking ties (absent workers rank lowest).
      Forced seats show as [JB] on the results and in the Excel export.
+     Yellow seats are optional and never forced. Once the required seats are
+     filled, they are handed out one at a time going down the scheduling
+     order: each worker takes their highest-ranked yellow pick still open,
+     then the next worker, and so on, in rounds until none are left.
   2. Publish Schedule: shows the empty schedule built from the draft. Click a
      cell to mark that shift as incentive pay (green); workers see the same
      green marking when picking shifts. Click a day's name to give that one
