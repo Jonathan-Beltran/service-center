@@ -373,12 +373,12 @@ def get_unavailable():
 @app.put("/unavailable/{initials}", dependencies=[Depends(require_auth)])
 def put_unavailable(initials: str, body: UnavailableUpdate):
     key = initials.strip().upper()
-    pub = store["published"]
-    if not pub:
-        raise HTTPException(status_code=400, detail="Create the schedule first")
-    if key not in {w["initials"] for w in pub["workers"]}:
+    # Marks are set on the Create Schedule tab, so accept the draft's workers
+    # and weeks as well as the posted schedule's
+    setups = [s for s in (store["draft"], store["published"]) if s]
+    if key not in {w["initials"] for s in setups for w in s["workers"]}:
         raise HTTPException(status_code=400, detail=f"{key} is not on the worker list")
-    cleaned = _clean_shift_lists(body.weeks, set(pub["weeks"]))
+    cleaned = _clean_shift_lists(body.weeks, {w for s in setups for w in s["weeks"]})
     with store_lock:
         _set_or_drop(store["unavailable"], key, cleaned)
         save_store()

@@ -343,6 +343,15 @@
   </div>
 </div>
 
+<div class="card">
+  <div class="card-head">
+    <h2>Can't-Work Shifts</h2>
+    <span class="save-state" id="cw-save-state"></span>
+  </div>
+  <div class="results-note">Mark shifts a worker absolutely cannot work. They will never be scheduled there, even if they picked it, and autofill skips them. These save right away and workers never see them.</div>
+  <div id="cw-body"></div>
+</div>
+
 <div class="help-text">Nothing on this tab is visible to workers until you press <strong>Publish Schedule</strong> on the Publish Schedule tab.</div>
 
 </div><!-- /tab-create -->
@@ -407,7 +416,7 @@
     <h2>Schedule History</h2>
     <button class="btn btn-ghost" onclick="loadHistory()">Refresh</button>
   </div>
-  <div class="results-note">Every time the schedule was run, newest first. View a run here or download it as an Excel sheet.</div>
+  <div class="results-note">View or download old schedules here.</div>
   <div class="status" id="history-status"></div>
   <div id="history-list"><p class="empty-msg">Loading…</p></div>
 </div>
@@ -436,15 +445,6 @@
     <span class="save-state" id="pref-updated" style="align-self:center"></span>
   </div>
   <div class="pref-list" id="pref-list"><p class="empty-msg">Loading…</p></div>
-</div>
-
-<div class="card">
-  <div class="card-head">
-    <h2>Can't-Work Shifts</h2>
-    <span class="save-state" id="cw-save-state"></span>
-  </div>
-  <div class="results-note">Mark shifts a worker absolutely cannot work. They will never be scheduled there, even if they picked it, and autofill skips them. Only supervisors can see or change these.</div>
-  <div id="cw-body"></div>
 </div>
 
 <div class="action-row">
@@ -664,6 +664,7 @@
         Object.keys(draft.incentives || {}).forEach(w => { if (!draft.weeks.includes(w)) delete draft.incentives[w]; });
         Object.keys(draft.overrides || {}).forEach(w => { if (!draft.weeks.includes(w)) delete draft.overrides[w]; });
         renderWeeks();
+        renderCantWork();
         if (document.getElementById("tab-preview").classList.contains("active")) renderPreview();
       }
       document.getElementById("save-state").textContent = "Draft saved";
@@ -686,6 +687,7 @@
     const tbody = document.getElementById("workers-tbody");
     const emptyRow = document.getElementById("workers-empty-row");
     Array.from(tbody.querySelectorAll("tr.worker-row")).forEach(r => r.remove());
+    renderCantWork();   // its worker list comes from here
     if (draft.workers.length === 0) { emptyRow.style.display = ""; return; }
     emptyRow.style.display = "none";
     draft.workers.forEach((w, i) => {
@@ -978,7 +980,6 @@
       if (res.status === 401) { handleUnauthorized(); return; }
       if (!res.ok) { showStatus(`Server error ${res.status}`, "error", statusEl); return; }
       published = null;
-      renderCantWork();
       updateBanner();
       renderPreferences();
       showStatus("Schedule removed from the staff view.", "success", statusEl);
@@ -1003,10 +1004,13 @@
 
   function renderCantWork() {
     const body = document.getElementById("cw-body");
-    if (!published) { body.innerHTML = '<p class="empty-msg">Create the schedule first.</p>'; return; }
-    const workers = published.workers.map(w => w.initials);
-    if (!workers.includes(cwWorker)) cwWorker = workers[0] || "";
-    if (!published.weeks.includes(cwWeek)) cwWeek = published.weeks[0] || "";
+    // Built from the draft, so marks can be set while the schedule is being set up
+    const weeks = draft.weeks || [];
+    const workers = draft.workers.map(w => w.initials);
+    if (weeks.length === 0) { body.innerHTML = '<p class="empty-msg">Pick a start and end date first.</p>'; return; }
+    if (workers.length === 0) { body.innerHTML = '<p class="empty-msg">Add workers first.</p>'; return; }
+    if (!workers.includes(cwWorker)) cwWorker = workers[0];
+    if (!weeks.includes(cwWeek)) cwWeek = weeks[0];
 
     const controls = `<div class="cw-controls">
       <div class="field-group"><label for="cw-worker">Worker</label>
@@ -1015,7 +1019,7 @@
         </select></div>
       <div class="field-group"><label for="cw-week">Week</label>
         <select id="cw-week" onchange="cwWeek = this.value; renderCantWork()">
-          ${published.weeks.map(w => `<option value="${w}"${w === cwWeek ? " selected" : ""}>Week of ${weekLabel(w)}</option>`).join("")}
+          ${weeks.map(w => `<option value="${w}"${w === cwWeek ? " selected" : ""}>Week of ${weekLabel(w)}</option>`).join("")}
         </select></div>
     </div>`;
 
@@ -1036,7 +1040,7 @@
 
     // Everyone with marks, so the supervisor can jump between them
     const chips = workers.filter(i => unavailable[i]).map(i => {
-      const n = published.weeks.reduce((t, w) => t + ((unavailable[i] || {})[w] || []).length, 0);
+      const n = weeks.reduce((t, w) => t + ((unavailable[i] || {})[w] || []).length, 0);
       return n ? `<span class="cw-chip" onclick="cwWorker='${i}'; renderCantWork()">${i}: ✕ ${n}</span>` : "";
     }).join("");
     const summary = chips ? `<div class="section-label" style="margin-top:14px">Workers with can't-work shifts</div><div class="cw-summary">${chips}</div>` : "";
